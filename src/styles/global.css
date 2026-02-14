@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'UhBee mysen';
+  src: url('/fonts/UhBee-mysen.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}

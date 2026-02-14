@@ -1,0 +1,81 @@
+---
+interface Props { class?: string; }
+const { class: className } = Astro.props;
+
+import Wind1 from "./Wind1.astro";
+import Wind2 from "./Wind2.astro";
+import Wind3 from "./Wind3.astro";
+import Wind4 from "./Wind4.astro";
+import Wind5 from "./Wind5.astro";
+import Wind6 from "./Wind6.astro";
+import Fan1 from "./Fan1.astro";
+import Fan2 from "./Fan2.astro";
+
+const Winds = [Wind1, Wind2, Wind3, Wind4, Wind5, Wind6];
+const Fans = [Fan1, Fan2];
+
+const indexHandler = (i: number) => (i + 6) % 6;
+---
+<div class={["flex", "justify-center", className].filter(Boolean).join(" ")} data-summer>
+  <div class="h-[100px] w-[100px] grid grid-rows-3">
+    {[0, 1, 2].map((val) => (
+      <div class="relative" key={`wind-row-${val}`}>
+        {Winds.map((Wind, index) => {
+          const frame = indexHandler(index - val);
+          return (
+            <div
+              class={`absolute wind-${frame}`}
+              data-summer-wind
+              data-wind-frame={frame}
+            >
+              <Wind class="stroke-primary" color="#505050" />
+            </div>
+          );
+        })}
+      </div>
+    ))}
+  </div>
+  <div class="relative" data-summer-fans>
+    {Fans.map((Fan, index) => {
+      const frame = indexHandler(index);
+      return (
+        <div
+          class={`absolute fan-${index} stroke-primary`}
+          data-summer-fan
+          data-fan-index={index}
+        >
+          <Fan color="#505050" />
+        </div>
+      );
+    })}
+  </div>
+</div>
+
+<script>
+  const indexHandler = (i) => (i + 6) % 6;
+  let count = 0;
+  function tick() {
+    count = count > 4 ? 0 : count + 1;
+    document.querySelectorAll("[data-summer] [data-wind-frame]").forEach((el) => {
+      const frame = Number(el.getAttribute("data-wind-frame"));
+      el.style.opacity = frame === count ? "1" : "0";
+    });
+    document.querySelectorAll("[data-summer] [data-fan-index]").forEach((el) => {
+      const i = Number(el.getAttribute("data-fan-index"));
+      const frame = indexHandler(i);
+      el.style.opacity = frame === count % 2 ? "1" : "0";
+    });
+  }
+  const id = setInterval(tick, 300);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) clearInterval(id);
+  });
+</script>
+
+<style>
+  [data-summer] [data-summer-wind],
+  [data-summer] [data-summer-fan] {
+    opacity: 0;
+    pointer-events: none;
+  }
+</style>

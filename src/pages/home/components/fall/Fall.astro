@@ -1,0 +1,49 @@
+---
+interface Props { class?: string; }
+const { class: className } = Astro.props;
+
+import Squirrel1 from "./Squirrel1.astro";
+import Squirrel2 from "./Squirrel2.astro";
+import Squirrel3 from "./Squirrel3.astro";
+import Squirrel4 from "./Squirrel4.astro";
+
+const Squirrels = [Squirrel1, Squirrel2, Squirrel3, Squirrel4];
+const indexHandler = (i: number) => (i + 4) % 4;
+---
+<div class={["flex", "justify-center", className].filter(Boolean).join(" ")} data-fall>
+  <div class="relative">
+    {Squirrels.map((Squirrel, index) => (
+      <div
+        class={`absolute top-1/2 left-1/2 -translate-x-[40%] -translate-y-1/2 fan-${index}`}
+        data-fall-squirrel
+        data-squirrel-index={index}
+      >
+        <Squirrel color="#505050" />
+      </div>
+    ))}
+  </div>
+</div>
+
+<script>
+  const indexHandler = (i) => (i + 4) % 4;
+  let count = 0;
+  function tick() {
+    count = (count + 1) % 4;
+    document.querySelectorAll("[data-fall] [data-squirrel-index]").forEach((el) => {
+      const i = Number(el.getAttribute("data-squirrel-index"));
+      el.style.opacity = indexHandler(i) === count % 2 ? "1" : "0";
+    });
+  }
+  tick();
+  const id = setInterval(tick, 300);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) clearInterval(id);
+  });
+</script>
+
+<style>
+  [data-fall] [data-fall-squirrel] {
+    opacity: 0;
+    pointer-events: none;
+  }
+</style>

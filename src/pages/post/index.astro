@@ -1,0 +1,9 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PostList from '../../components/PostList';
+---
+<Layout title="POST | Ramen Blog">
+  <h1 class="page-title">Post</h1>
+  <p class="page-subtitle">글 목록</p>
+  <PostList client:load />
+</Layout>

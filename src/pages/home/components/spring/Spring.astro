@@ -1,0 +1,44 @@
+---
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+
+import Bee1 from "./Bee1.astro";
+import Bee2 from "./Bee2.astro";
+const Bees = [Bee1, Bee2];
+---
+<div class={["flex", "justify-center", className].filter(Boolean).join(" ")}>
+  <div class="relative" data-spring-container>
+    {Bees.map((Bee, index) => (
+      <div
+        class={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 stroke-primary fan-${index}`}
+        data-bee-index={index}
+      >
+        <Bee color="#505050" />
+      </div>
+    ))}
+  </div>
+</div>
+
+<style>
+  [data-spring-container] [data-bee-index] {
+    opacity: 0;
+  }
+</style>
+<script>
+  const indexHandler = (i) => (i + 4) % 4;
+  let count = 0;
+  function tick() {
+    count = (count + 1) % 4;
+    document.querySelectorAll("[data-spring-container] [data-bee-index]").forEach((el) => {
+      const i = Number(el.getAttribute("data-bee-index"));
+      el.style.opacity = indexHandler(i) === count % 2 ? "1" : "0";
+    });
+  }
+  tick();
+  const id = setInterval(tick, 300);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) clearInterval(id);
+  });
+</script>

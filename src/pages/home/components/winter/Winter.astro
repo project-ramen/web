@@ -1,0 +1,67 @@
+---
+interface Props { class?: string; }
+const { class: className } = Astro.props;
+
+import Snow1 from "./Snow1.astro";
+import Snow2 from "./Snow2.astro";
+import Snow3 from "./Snow3.astro";
+import Snow4 from "./Snow4.astro";
+import SnowMan1 from "./SnowMan1.astro";
+import SnowMan2 from "./SnowMan2.astro";
+
+const Snows = [Snow1, Snow2, Snow3, Snow4];
+const Snowmans = [SnowMan1, SnowMan2];
+const indexHandler = (i: number) => (i + 4) % 4;
+---
+<div class={["flex", "justify-center", className].filter(Boolean).join(" ")} data-winter>
+  <div class="relative">
+    {Snows.map((Snow, index) => (
+      <div
+        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+        data-winter-snow
+        data-snow-index={index}
+      >
+        <Snow class="stroke-primary" color="#505050" />
+      </div>
+    ))}
+    {Snowmans.map((SnowMan, index) => (
+      <div
+        data-winter-snowman
+        data-snowman-index={index}
+      >
+        <SnowMan color="#505050" />
+      </div>
+    ))}
+  </div>
+</div>
+
+<script>
+  const indexHandler = (i) => (i + 4) % 4;
+  let count = 0;
+  function tick() {
+    count = (count + 1) % 4;
+    document.querySelectorAll("[data-winter] [data-snow-index]").forEach((el) => {
+      const i = Number(el.getAttribute("data-snow-index"));
+      el.style.opacity = indexHandler(i) === count ? "1" : "0";
+    });
+    document.querySelectorAll("[data-winter] [data-snowman-index]").forEach((el) => {
+      const i = Number(el.getAttribute("data-snowman-index"));
+      el.style.display = indexHandler(i) === count % 2 ? "block" : "none";
+    });
+  }
+  tick();
+  const id = setInterval(tick, 300);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) clearInterval(id);
+  });
+</script>
+
+<style>
+  [data-winter] [data-winter-snow] {
+    opacity: 0;
+    pointer-events: none;
+  }
+  [data-winter] [data-winter-snowman] {
+    display: none;
+  }
+</style>
