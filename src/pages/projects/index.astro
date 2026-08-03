@@ -1,0 +1,50 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { loadProjects } from './_data/load';
+import ProjectPostList from '../../components/ProjectPostList';
+
+const projects = loadProjects();
+---
+<Layout title="PROJECT | Ramen Blog">
+  <div class="project-page">
+    <header class="project-header">
+      <h1 class="font-display text-[clamp(2rem,5vw,3rem)] m-0 mb-2 text-neutral-900 dark:text-neutral-100">Project</h1>
+      <p class="text-neutral-500 dark:text-neutral-400 text-base m-0">이것도 만들었는데 보실래요?</p>
+    </header>
+
+    <div class="project-list">
+      {projects.map((p) => (
+        <article class="project-row" data-project={p.id}>
+          <a href={`/projects/${p.id}`} class="project-row-link" aria-label={`${p.name} - ${p.tagline}`}>
+            <div class="project-row-bg">
+              <span class="project-row-bg-icon" aria-hidden="true">{p.icon}</span>
+            </div>
+            <div class="project-row-island">
+              <span class="project-row-category">{p.category}</span>
+              <h2 class="project-row-title">{p.name}</h2>
+              <p class="project-row-tagline">{p.tagline}</p>
+              <p class="project-row-desc">{p.description}</p>
+              <span class="project-row-cta">{p.linkLabel} →</span>
+            </div>
+          </a>
+        </article>
+      ))}
+      <ProjectPostList client:load />
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .project-page {
+    padding-bottom: 2rem;
+  }
+  .project-header {
+    margin-bottom: 2rem;
+  }
+
+  .project-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+</style>

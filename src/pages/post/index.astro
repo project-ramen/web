@@ -3,7 +3,9 @@ import Layout from '../../layouts/Layout.astro';
 import PostList from '../../components/PostList';
 ---
 <Layout title="POST | Ramen Blog">
-  <h1 class="page-title">Post</h1>
-  <p class="page-subtitle">글 목록</p>
-  <PostList client:load />
+  <div class="min-w-0 w-full">
+    <!-- <h1 class="font-display text-[clamp(1.75rem,5vw,3rem)] m-0 mb-2 text-neutral-900 dark:text-neutral-100">Post</h1> -->
+    <p class="text-neutral-500 dark:text-neutral-400 text-base m-0 mb-4 sm:mb-6">글 목록</p>
+    <PostList client:load />
+  </div>
 </Layout>

@@ -1,10 +1,20 @@
 ---
 import '../styles/global.css';
+import FoxSide from "./components/_svg/_fox_side.svg";
+import Parasol from "./components/_svg/_parasol.svg";
+import Lamp from "./components/_svg/_lamp.svg";
+import pkg from "../../package.json";
 
 interface Props {
   title?: string;
 }
 const { title = 'Ramen Blog' } = Astro.props;
+const appVersion = pkg.version;
+const pathname = Astro.url.pathname;
+const isHome = pathname === '/' || pathname === '';
+const isPost = pathname === '/post' || pathname.startsWith('/post/');
+const isProject = pathname === '/projects' || pathname.startsWith('/projects/');
+const isAbout = pathname === '/about' || pathname.startsWith('/about/');
 ---
 <!doctype html>
 <html lang="ko">
@@ -15,200 +25,152 @@ const { title = 'Ramen Blog' } = Astro.props;
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Jua&display=swap" rel="stylesheet" />
+    <script is:inline>
+      (function() {
+        var stored = localStorage.getItem('theme');
+        if (stored === 'dark') document.documentElement.classList.add('dark');
+        else if (stored === 'light') document.documentElement.classList.remove('dark');
+        else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.classList.add('dark');
+      })();
+    </script>
   </head>
-  <body>
-    <div class="page-grid">
-      <header class="site-header">
-        <nav class="header-nav" aria-label="메인 메뉴">
-          <a href="/post">Post</a>
-          <a href="/">Home</a>
-          <a href="/project">Project</a>
-          <a href="/about">About</a>
+  <body class="min-h-screen m-0 font-sans text-neutral-900 dark:text-neutral-100 bg-neutral-50 dark:bg-neutral-800 transition-colors overflow-x-hidden">
+    <div class={`grid grid-rows-[auto_1fr_auto] ${isHome ? 'h-screen overflow-hidden' : 'min-h-screen'} items-center justify-items-center gap-0 sm:gap-8 sm:py-8 sm:px-8 md:pt-10 md:px-10 bg-web`} id="layout-container">
+      <header class="sticky top-0 z-30 bg-web w-full max-w-[720px] min-w-0 px-4 py-4">
+        <nav class="flex flex-wrap items-center justify-between gap-3 sm:gap-8 text-base sm:text-lg font-medium" aria-label="메인 메뉴">
+          <div class="flex flex-wrap items-center gap-4 sm:gap-8 min-w-0" id="nav-links">
+            <a href="/post" data-route="post" class={`nav-link text-neutral-900 dark:text-neutral-100 no-underline hover:underline underline-offset-2 ${isPost ? 'font-semibold underline' : ''}`}>Post</a>
+            <a href="/" data-route="home" class={`nav-link text-neutral-900 dark:text-neutral-100 no-underline hover:underline underline-offset-2 ${isHome ? 'font-semibold underline' : ''}`}>Home</a>
+            <a href="/projects" data-route="project" class={`nav-link text-neutral-900 dark:text-neutral-100 no-underline hover:underline underline-offset-2 ${isProject ? 'font-semibold underline' : ''}`}>Project</a>
+            <a href="/about" data-route="about" class={`nav-link text-neutral-900 dark:text-neutral-100 no-underline hover:underline underline-offset-2 ${isAbout ? 'font-semibold underline' : ''}`}>About</a>
+          </div>
+          <button type="button" id="theme-toggle" class="p-2 rounded-lg text-neutral-900 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors" aria-label="다크/라이트 테마 전환">
+            <span class="theme-icon-dark hidden dark:inline" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span>
+            <span class="theme-icon-light dark:hidden inline" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></span>
+          </button>
         </nav>
       </header>
-      <main class="main">
-        <slot />
+      <main class={`w-full max-w-[720px] min-w-0 justify-self-center box-border self-stretch min-h-0`}>
+        {isPost && (
+          <div class="fixed top-24 left-[calc(50%-360px)] translate-x-[-100%] hidden md:block [.dark_&]:hidden">
+            <div class="peek-in parasol-sway">
+              <Parasol width={200} class="translate-x-[20px]"/>
+            </div>
+          </div>
+        )}
+        {isPost && (
+          <div class="fixed top-28 left-[calc(50%-360px)] translate-x-[-100%] hidden md:[.dark_&]:block">
+            <div class="peek-in relative">
+              <div class="lamp-glow"></div>
+              <Lamp width={200} class="relative translate-x-[20px]"/>
+            </div>
+          </div>
+        )}
+        <div class={`relative z-20 w-full min-h-full ${isHome ? '' : 'p-4 bg-neutral-50 dark:bg-neutral-800 rounded-none sm:rounded-2xl'}`}>
+          <slot/>
+        </div>
+        <div class={`fixed top-1/2 left-[calc(50%-360px)] translate-x-[-100%] -translate-y-1/2 z-20 pointer-events-none ${isHome ? "hidden" : "hidden min-[850px]:block"}`}>
+          <FoxSide width={100} class="translate-x-[20px]"/>
+        </div>
+        
       </main>
-      <footer class="site-footer">
-        <a class="footer-link" href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
-          <span class="footer-icon" aria-hidden="true">⌘</span>
-          <span class="footer-label">Github →</span>
-        </a>
-        <a class="footer-link" href="/post" aria-label="Logs">
-          <span class="footer-icon" aria-hidden="true">◐</span>
-          <span class="footer-label">Logs →</span>
-        </a>
+      <footer class="w-full max-w-[720px] min-w-0 px-4 py-4 flex flex-wrap items-center justify-between gap-3 text-sm text-neutral-500 dark:text-neutral-400 z-10 bg-neutral-50 dark:bg-neutral-800 sm:bg-transparent dark:sm:bg-transparent">
+        <span class="flex items-center gap-2">
+          <span>&copy; 2026 Ramen Blog</span>
+          <span aria-hidden="true">·</span>
+          <span>v{appVersion}</span>
+        </span>
+        <a href="mailto:denis0324@naver.com" class="hover:text-neutral-900 dark:hover:text-neutral-100 hover:underline underline-offset-2" aria-label="이메일 보내기">dennis0324@naver.com</a>
       </footer>
     </div>
+    <script is:inline>
+      document.getElementById('theme-toggle')?.addEventListener('click', function() {
+        var html = document.documentElement;
+        var isDark = html.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        document.dispatchEvent(new CustomEvent('theme-changed', { detail: { dark: isDark } }));
+      });
+      (function syncLayoutFromPathname() {
+        var path = window.location.pathname || '/';
+        var active = (path === '/' || path === '') ? 'home' : (path === '/post' || path.indexOf('/post/') === 0) ? 'post' : (path === '/projects' || path.indexOf('/projects/') === 0) ? 'project' : (path === '/about' || path.indexOf('/about/') === 0) ? 'about' : null;
+        var nav = document.getElementById('nav-links');
+        if (nav) {
+          var links = nav.querySelectorAll('.nav-link');
+          for (var i = 0; i < links.length; i++) {
+            var link = links[i];
+            var route = link.getAttribute('data-route');
+            link.classList.remove('font-semibold', 'underline');
+            if (route === active) link.classList.add('font-semibold', 'underline');
+          }
+        }
+      })();
+    </script>
   </body>
 </html>
 
-<style is:global>
-  :root {
-    --nav-height: 56px;
-    --font-sans: 'Noto Sans KR', system-ui, sans-serif;
-    --font-display: 'UhBee mysen', 'Jua', sans-serif;
-    --font-uhbee: 'UhBee mysen', sans-serif;
-    --color-fg: #1a1a1a;
-    --color-muted: #505050;
-    --color-border: #e5e5e5;
-    --color-bg: #fafafa;
+<style>
+  .bg-web {
+    background-color: #879e82;
   }
-  * {
-    box-sizing: border-box;
+  .dark .bg-web {
+    background-color: #586954;
   }
-  html {
-    scroll-padding-top: var(--nav-height);
+
+  .peek-in {
+    transform-origin: bottom right;
+    animation: peek-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    font-family: var(--font-sans);
-    color: var(--color-fg);
-    background: var(--color-bg);
-  }
-  .page-grid {
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    min-height: 100vh;
-    align-items: center;
-    justify-items: center;
-    padding: 20px 2rem 5rem;
-    gap: 2rem;
-  }
-  @media (min-width: 640px) {
-    .page-grid {
-      padding: 2.5rem 2.5rem 5rem;
+
+  @keyframes peek-in {
+    0% {
+      transform: translate(-14px, 18px) rotate(16deg);
+      opacity: 0;
+    }
+    100% {
+      transform: translate(0, 0) rotate(0deg);
+      opacity: 1;
     }
   }
-  .site-header {
-    width: 100%;
-    max-width: 720px;
+
+  .parasol-sway {
+    animation:
+      peek-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+      parasol-sway 3s ease-in-out 0.7s infinite;
   }
-  .header-nav {
-    display: flex;
-    gap: 2rem;
-    font-size: 1.125rem;
-    font-weight: 500;
+
+  @keyframes parasol-sway {
+    0%, 100% {
+      transform: rotate(0deg);
+    }
+    25% {
+      transform: rotate(5deg);
+    }
+    75% {
+      transform: rotate(-5deg);
+    }
   }
-  .header-nav a {
-    color: var(--color-fg);
-    text-decoration: none;
-  }
-  .header-nav a:hover {
-    text-decoration: underline;
-    text-underline-offset: 4px;
-  }
-  .main {
-    width: 100%;
-    max-width: 720px;
-    padding: 0 1rem;
-    justify-self: center;
-  }
-  .site-footer {
-    display: flex;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-  }
-  .footer-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--color-muted);
-    text-decoration: none;
-    font-size: 0.9375rem;
-  }
-  .footer-link:hover {
-    color: var(--color-fg);
-    text-decoration: underline;
-    text-underline-offset: 4px;
-  }
-  .footer-link:hover .footer-label {
-    max-width: 120px;
-    opacity: 1;
-  }
-  .footer-icon {
-    flex-shrink: 0;
-    font-size: 1.25rem;
-  }
-  .footer-label {
-    max-width: 0;
-    overflow: hidden;
+
+  .lamp-glow {
+    position: absolute;
+    top: 120px;
+    left: 18px;
+    width: 130px;
+    height: 100px;
+    transform: rotate(-15deg);
+    transform-origin: top center;
+    clip-path: polygon(23% 0%, 77% 0%, 100% 100%, 0% 100%);
+    background: linear-gradient(180deg, rgba(235, 189, 65, 0.55) 0%, rgba(235, 189, 65, 0) 70%);
+    pointer-events: none;
     opacity: 0;
-    white-space: nowrap;
-    transition: max-width 0.25s ease, opacity 0.2s ease;
+    animation: lamp-on 0.5s ease-out 0.7s both;
   }
-  .page-title {
-    font-family: var(--font-display);
-    font-size: clamp(2rem, 5vw, 3rem);
-    margin: 0 0 0.5rem 0;
-    color: var(--color-fg);
+
+  @keyframes lamp-on {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
-  .page-subtitle {
-    color: var(--color-muted);
-    font-size: 1rem;
-    margin: 0 0 1.5rem 0;
-  }
-  .post-realtime-viewer { margin-top: 1rem; }
-  .viewer-status { font-size: 0.875rem; color: var(--color-muted); margin-bottom: 0.5rem; }
-  .viewer-status .connected { color: #0a6b0a; }
-  .viewer-content-wrap { position: relative; }
-  .viewer-content { line-height: 1.7; }
-  article.viewer-content { display: flow-root; }
-  .viewer-content .empty { color: #888; font-style: italic; }
-  .viewer-content h1, .viewer-content h2, .viewer-content h3 { margin-top: 1.25em; margin-bottom: 0.5em; }
-  .viewer-content pre { background: #f0f0f0; padding: 0.75rem; border-radius: 6px; overflow: auto; }
-  .viewer-content code { font-family: ui-monospace, monospace; font-size: 0.9em; }
-  .viewer-cursor-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    overflow: auto;
-    padding: 0;
-    font-family: inherit;
-    font-size: 1rem;
-    line-height: 1.7;
-    box-sizing: border-box;
-  }
-  .viewer-cursor-mirror {
-    word-break: break-word;
-    visibility: hidden;
-    height: min-content;
-  }
-  .viewer-remote-selection {
-    position: absolute;
-    pointer-events: none;
-    opacity: 0.35;
-    border-radius: 2px;
-  }
-  .viewer-remote-cursor {
-    position: absolute;
-    min-width: 2px;
-    margin-top: 0;
-    border-radius: 0.1em;
-    animation: viewer-cursor-blink 1s step-end infinite;
-    box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
-    /* width, height: 인라인으로 측정값 적용 */
-  }
-  @keyframes viewer-cursor-blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-  .comments-section { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
-  .comment-form textarea { width: 100%; max-width: 480px; padding: 0.5rem; margin-bottom: 0.5rem; border: 1px solid var(--color-border); border-radius: 6px; font-family: inherit; }
-  .comment-form button { padding: 0.4rem 0.75rem; cursor: pointer; font-family: inherit; }
-  .comment-list { list-style: none; padding: 0; margin: 1rem 0 0 0; }
-  .comment-list li { padding: 0.75rem 0; border-bottom: 1px solid var(--color-border); }
-  .comment-meta { font-size: 0.875rem; color: var(--color-muted); }
-  .post-list { list-style: none; padding: 0; }
-  .post-list li { padding: 0.5rem 0; }
-  .post-list a { text-decoration: none; color: var(--color-fg); }
-  .post-list a:hover { text-decoration: underline; text-underline-offset: 4px; }
-  .post-list .meta { color: var(--color-muted); font-size: 0.875rem; }
-  .deleted-section-notice { padding: 0.5rem; background: #fff8e6; border-left: 3px solid #e0a000; margin: 0.5rem 0; border-radius: 0 4px 4px 0; }
-  .deleted-section-notice .link { background: none; border: none; color: #0066cc; cursor: pointer; text-decoration: underline; }
-  .deleted-section-notice .revision-snippet { font-size: 0.875rem; white-space: pre-wrap; margin-top: 0.5rem; padding: 0.5rem; background: #f5f5f5; border-radius: 4px; }
 </style>

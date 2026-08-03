@@ -1,4 +1,92 @@
 @import "tailwindcss";
+/* Code block syntax highlighting (light) */
+@import "highlight.js/styles/github.min.css";
+/* Dark: override with github-dark when .dark is on html */
+.dark .markdown-content pre .hljs,
+.dark .markdown-content .hljs {
+  color: #c9d1d9;
+}
+.dark .markdown-content pre .hljs .hljs-keyword,
+.dark .markdown-content .hljs .hljs-keyword { color: #ff7b72; }
+.dark .markdown-content pre .hljs .hljs-string,
+.dark .markdown-content .hljs .hljs-string { color: #a5d6ff; }
+.dark .markdown-content pre .hljs .hljs-number,
+.dark .markdown-content .hljs .hljs-number { color: #79c0ff; }
+.dark .markdown-content pre .hljs .hljs-comment,
+.dark .markdown-content .hljs .hljs-comment { color: #8b949e; }
+.dark .markdown-content pre .hljs .hljs-function,
+.dark .markdown-content .hljs .hljs-function { color: #d2a8ff; }
+.dark .markdown-content pre .hljs .hljs-title,
+.dark .markdown-content .hljs .hljs-title { color: #d2a8ff; }
+.dark .markdown-content pre .hljs .hljs-params,
+.dark .markdown-content .hljs .hljs-params { color: #c9d1d9; }
+.dark .markdown-content pre .hljs .hljs-built_in,
+.dark .markdown-content .hljs .hljs-built_in { color: #ffa657; }
+.dark .markdown-content pre .hljs .hljs-class .hljs-title,
+.dark .markdown-content .hljs .hljs-class .hljs-title { color: #ffa657; }
+.dark .markdown-content pre .hljs .hljs-attr,
+.dark .markdown-content .hljs .hljs-attr { color: #79c0ff; }
+.dark .markdown-content pre .hljs .hljs-variable,
+.dark .markdown-content .hljs .hljs-variable { color: #ffa657; }
+.dark .markdown-content pre .hljs .hljs-regexp,
+.dark .markdown-content .hljs .hljs-regexp { color: #7ee787; }
+.dark .markdown-content pre .hljs .hljs-meta,
+.dark .markdown-content .hljs .hljs-meta { color: #8b949e; }
+.dark .markdown-content pre .hljs .hljs-tag .hljs-name,
+.dark .markdown-content .hljs .hljs-tag .hljs-name { color: #7ee787; }
+.dark .markdown-content pre .hljs .hljs-punctuation,
+.dark .markdown-content .hljs .hljs-punctuation { color: #c9d1d9; }
+.dark .markdown-content pre .hljs .hljs-doctag,
+.dark .markdown-content .hljs .hljs-doctag { color: #8b949e; }
+.dark .markdown-content pre .hljs .hljs-section,
+.dark .markdown-content .hljs .hljs-section { color: #79c0ff; font-weight: 700; }
+.dark .markdown-content pre .hljs .hljs-addition,
+.dark .markdown-content .hljs .hljs-addition { color: #7ee787; background: rgba(46,160,67,.15); }
+.dark .markdown-content pre .hljs .hljs-deletion,
+.dark .markdown-content .hljs .hljs-deletion { color: #f85149; background: rgba(248,81,73,.15); }
+.dark .markdown-content pre .hljs .hljs-selector-attr,
+.dark .markdown-content .hljs .hljs-selector-attr { color: #7ee787; }
+.dark .markdown-content pre .hljs .hljs-selector-pseudo,
+.dark .markdown-content .hljs .hljs-selector-pseudo { color: #7ee787; }
+.dark .markdown-content pre .hljs .hljs-selector-class,
+.dark .markdown-content .hljs .hljs-selector-class { color: #7ee787; }
+.dark .markdown-content pre .hljs .hljs-selector-id,
+.dark .markdown-content .hljs .hljs-selector-id { color: #ffa657; }
+.dark .markdown-content pre .hljs .hljs-literal,
+.dark .markdown-content .hljs .hljs-literal { color: #79c0ff; }
+.dark .markdown-content pre .hljs .hljs-subst,
+.dark .markdown-content .hljs .hljs-subst { color: #c9d1d9; }
+.dark .markdown-content pre .hljs .hljs-type,
+.dark .markdown-content .hljs .hljs-type { color: #ffa657; }
+.dark .markdown-content pre .hljs .hljs-symbol,
+.dark .markdown-content .hljs .hljs-symbol { color: #ffa657; }
+.dark .markdown-content pre .hljs .hljs-bullet,
+.dark .markdown-content .hljs .hljs-bullet { color: #ffa657; }
+.dark .markdown-content pre .hljs .hljs-link,
+.dark .markdown-content .hljs .hljs-link { color: #a5d6ff; }
+.dark .markdown-content pre .hljs .hljs-emphasis,
+.dark .markdown-content .hljs .hljs-emphasis { font-style: italic; }
+.dark .markdown-content pre .hljs .hljs-strong,
+.dark .markdown-content .hljs .hljs-strong { font-weight: 700; }
+
+/* class 기반 다크 모드: html에 .dark 있으면 dark: 유틸 적용 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-family-sans: 'Noto Sans KR', system-ui, sans-serif;
+  --font-family-display: 'UhBee mysen', 'Jua', sans-serif;
+}
+
+/* 전역에서 font-family-display 사용 가능하도록 (Tailwind @theme 외 사용처) */
+:root {
+  --font-family-display: 'UhBee mysen', 'Jua', sans-serif;
+  --color-muted: #737373;
+  --season-icon: #404040;
+}
+.dark {
+  --color-muted: #a3a3a3;
+  --season-icon: #d4d4d4;
+}
 
 @font-face {
   font-family: 'UhBee mysen';
@@ -6,4 +94,487 @@
   font-weight: normal;
   font-style: normal;
   font-display: swap;
+}
+
+/* Minimal global: scroll anchor offset, box-sizing, cursor blink */
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-padding-top: 56px;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+/* Markdown content - same as app preview (headers, code, lists, images) */
+.markdown-content {
+  font-size: 0.95rem;
+  line-height: 1.625;
+  color: inherit;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+.markdown-content h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+.markdown-content h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+.markdown-content h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.375rem;
+}
+.markdown-content h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.375rem;
+}
+.markdown-content h5 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.markdown-content h6 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+  color: var(--color-muted);
+}
+.markdown-content pre {
+  padding: 0.75rem 1rem;
+  border-radius: 0.375rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 0.5rem 0;
+  background: #f4f4f4;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+.markdown-content .code-block-wrapper {
+  margin: 0.5rem 0;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.markdown-content .code-block-wrapper pre {
+  padding-top: 2.25rem;
+  padding-right: 6.5rem;
+}
+@media (max-width: 640px) {
+  .markdown-content .code-block-wrapper pre {
+    padding-right: 4rem;
+  }
+}
+.dark .markdown-content pre {
+  background: #484747;
+}
+.markdown-content code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+}
+.markdown-content pre code {
+  padding: 0;
+  background: transparent;
+}
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  margin: 0.5rem 0;
+  border-radius: 0.25rem;
+}
+.markdown-content p {
+  margin: 0 0 0.75rem;
+}
+.markdown-content .table-scroll-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0.75rem 0;
+  max-width: 100%;
+}
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0;
+  min-width: min(100%, 320px);
+}
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid #e5e5e5;
+  padding: 0.375rem 0.5rem;
+  text-align: left;
+}
+@media (min-width: 641px) {
+  .markdown-content th,
+  .markdown-content td {
+    padding: 0.375rem 0.625rem;
+  }
+}
+.dark .markdown-content th,
+.dark .markdown-content td {
+  border-color: #525252;
+}
+.markdown-content th {
+  font-weight: 600;
+  background: #f4f4f4;
+}
+.dark .markdown-content th {
+  background: #262626;
+}
+.markdown-content a {
+  color: #2563eb;
+  text-decoration: none;
+}
+.dark .markdown-content a {
+  color: #93c5fd;
+}
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+/* Project 카드 — /project 목록의 수동 프로젝트 + 태그 기반 자동 프로젝트가 공유 (Astro scoped style로는
+   React가 렌더링하는 카드에 적용되지 않아 global로 둔다) */
+.project-row {
+  border-radius: 1rem;
+  --card-tile-bg: #e5e5e5;
+  --card-title: #171717;
+  --island-bg: rgba(255, 255, 255, 0.78);
+  --island-border: rgba(255, 255, 255, 0.5);
+  --card-bg-mobile: #ffffff;
+}
+.dark .project-row {
+  --card-tile-bg: #404040;
+  --card-title: #fafafa;
+  --island-bg: rgba(38, 38, 38, 0.78);
+  --island-border: rgba(255, 255, 255, 0.08);
+  --card-bg-mobile: #262626;
+}
+.project-row-link {
+  position: relative;
+  display: block;
+  height: 200px;
+  border-radius: 1rem;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.dark .project-row-link {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+@media (min-width: 640px) {
+  .project-row-link {
+    height: 260px;
+  }
+}
+/* 배경: 단일 색 타일. hover 시 블러 + 살짝 확대 */
+.project-row-bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-tile-bg);
+  transition: filter 0.5s ease, transform 0.5s ease;
+}
+.project-row-link:hover .project-row-bg {
+  filter: blur(14px) brightness(0.9);
+  transform: scale(1.08);
+}
+.project-row-bg-icon {
+  font-size: 3rem;
+  line-height: 1;
+  opacity: 0.9;
+  transition: opacity 0.3s ease;
+}
+.project-row-link:hover .project-row-bg-icon {
+  opacity: 0;
+}
+/* 플로팅 아일랜드: 기본은 숨김, hover 시 오른쪽에 둥실 떠오름 */
+.project-row-island {
+  position: absolute;
+  top: 50%;
+  right: 1.5rem;
+  width: min(320px, calc(100% - 3rem));
+  transform: translateY(-50%) translateX(20px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1rem;
+  background: var(--island-bg);
+  border: 1px solid var(--island-border);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@media (min-width: 640px) {
+  .project-row-link:hover .project-row-island {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+/* 아일랜드 안 요소들이 살짝 늦게 순차 등장 */
+.project-row-island > * {
+  opacity: 0;
+  transform: translateX(10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.project-row-link:hover .project-row-island > * {
+  opacity: 1;
+  transform: translateX(0);
+}
+.project-row-island > *:nth-child(1) { transition-delay: 0.1s; }
+.project-row-island > *:nth-child(2) { transition-delay: 0.16s; }
+.project-row-island > *:nth-child(3) { transition-delay: 0.22s; }
+.project-row-island > *:nth-child(4) { transition-delay: 0.28s; }
+.project-row-island > *:nth-child(5) { transition-delay: 0.34s; }
+.project-row-category {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+.project-row-title {
+  font-family: var(--font-family-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--card-title);
+}
+.project-row-tagline {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin: 0;
+  color: var(--card-title);
+}
+.project-row-desc {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  margin: 0;
+  color: var(--color-muted);
+}
+.project-row-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  padding: 0.4375rem 0.875rem;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.dark .project-row-cta {
+  background: #3b82f6;
+}
+/* 모바일: hover 없이 아일랜드를 항상 하단에 고정 표시 */
+@media (max-width: 640px) {
+  .project-row-link {
+    height: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .project-row-bg {
+    position: relative;
+    height: 140px;
+    filter: none !important;
+    transform: none !important;
+  }
+  .project-row-bg-icon {
+    opacity: 0.9 !important;
+  }
+  .project-row-island {
+    position: relative;
+    inset: auto;
+    top: auto;
+    right: auto;
+    width: auto;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    background: var(--card-bg-mobile);
+  }
+  .project-row-island > * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Project 상세 — 수동 프로젝트(ProjectDetailPage.astro) + 태그 기반 포스트 프로젝트(PostProjectDetail.tsx) 공유 */
+.project-detail {
+  padding-bottom: 3rem;
+}
+.project-detail-back {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+  text-decoration: none;
+}
+.project-detail-back:hover {
+  color: var(--tw-prose-links);
+  text-decoration: underline;
+}
+.project-detail-banner-wrap {
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #f5f5f5;
+  margin-bottom: 1.5rem;
+}
+.dark .project-detail-banner-wrap {
+  background: #404040;
+}
+.project-detail-banner {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.project-detail-header {
+  margin-bottom: 1.5rem;
+}
+.project-detail-category {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.project-detail-head-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.project-detail-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  flex-shrink: 0;
+  border-radius: 1rem;
+  font-size: 2rem;
+  line-height: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.project-detail-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.project-detail-title {
+  font-family: var(--font-family-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--card-title, #171717);
+}
+.dark .project-detail-title {
+  color: var(--card-title, #fafafa);
+}
+.project-detail-tagline {
+  font-size: 1rem;
+  font-weight: 500;
+  margin: 0;
+  color: var(--color-muted);
+}
+.project-detail-desc {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0 0 1rem;
+  color: var(--color-muted);
+}
+.project-detail-content {
+  margin: 1.5rem 0;
+}
+/* .project-body-markdown uses global .markdown-content (same as app preview) */
+.project-detail-content .project-body-markdown {
+  color: var(--color-muted);
+}
+.project-detail-content .project-page-content {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--color-muted);
+}
+.project-detail-content .project-page-content h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 1.5rem 0 0.5rem;
+  color: var(--card-title, #171717);
+}
+.project-detail-content .project-page-content h2:first-child {
+  margin-top: 0;
+}
+.project-detail-content .project-page-content p {
+  margin: 0 0 0.75rem;
+}
+.project-detail-content .project-page-content ul,
+.project-detail-content .project-page-content ol {
+  margin: 0 0 0.75rem;
+  padding-left: 1.5rem;
+}
+.project-detail-content .project-page-content a {
+  color: #2563eb;
+  text-decoration: none;
+}
+.dark .project-detail-content .project-page-content a {
+  color: #93c5fd;
+}
+.project-detail-content .project-page-content a:hover {
+  text-decoration: underline;
+}
+.project-detail-cta {
+  display: inline-block;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #2563eb;
+  text-decoration: none;
+}
+.dark .project-detail-cta {
+  color: #93c5fd;
+}
+.project-detail-cta:hover {
+  text-decoration: underline;
+}
+.project-detail-cta-disabled {
+  color: var(--color-muted);
+  cursor: default;
+}
+.project-detail-404 {
+  font-size: 1rem;
+  color: var(--color-muted);
+  margin: 0;
 }

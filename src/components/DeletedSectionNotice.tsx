@@ -1,6 +1,5 @@
 import { useState } from 'react';
-
-const API_URL = typeof window !== 'undefined' ? (import.meta.env.PUBLIC_API_URL || 'http://localhost:3000') : '';
+import { getApiBase } from '../lib/apiBase';
 
 /** 댓글이 참조하던 구간이 삭제된 경우 표시. "자세히 보기" 시 해당 리비전 내용 일부(위 3줄/해당/아래 3줄) 표시 */
 type Props = { revisionId: number; anchorLabel?: string };
@@ -11,9 +10,10 @@ export default function DeletedSectionNotice({ revisionId, anchorLabel }: Props)
   const [loading, setLoading] = useState(false);
 
   const loadPreview = () => {
-    if (!API_URL || open) return;
+    const apiUrl = getApiBase();
+    if (!apiUrl || open) return;
     setLoading(true);
-    fetch(`${API_URL}/api/revisions/${revisionId}`)
+    fetch(`${apiUrl}/api/revisions/${revisionId}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((rev: { body_md?: string } | null) => {
         if (!rev?.body_md) {
@@ -37,7 +37,7 @@ export default function DeletedSectionNotice({ revisionId, anchorLabel }: Props)
         지워진 부분 자세히 보기
       </button>
       {open && snippet !== null && (
-        <pre className="revision-snippet">{snippet}</pre>
+        <pre className="revision-snippet mt-3 p-3 rounded-md text-sm whitespace-pre-wrap bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100">{snippet}</pre>
       )}
     </div>
   );

@@ -1,0 +1,18 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ProjectDetailPage from '../../components/ProjectDetailPage.astro';
+import PostProjectDetail from '../../components/PostProjectDetail';
+import { getProject } from './_data/load';
+
+export const prerender = false;
+
+const { id } = Astro.params ?? {};
+const project = id ? getProject(id) : null;
+---
+<Layout title={project ? `${project.name} | Project | Ramen Blog` : `${id ?? ''} | Project | Ramen Blog`}>
+  {project ? (
+    <ProjectDetailPage project={project} />
+  ) : (
+    <PostProjectDetail client:load slug={id ?? ''} />
+  )}
+</Layout>

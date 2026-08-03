@@ -1,0 +1,55 @@
+---
+import ProjectBody from './ProjectBody';
+import ProjectPageContent from './ProjectPageContent';
+import type { Project } from '../pages/projects/_data/types';
+
+interface Props {
+  project: Project | null;
+}
+
+const { project } = Astro.props;
+---
+{project ? (
+  <div class="project-detail">
+    <a href="/projects" class="project-detail-back">← 프로젝트 목록</a>
+    {project.banner && (
+      <div class="project-detail-banner-wrap">
+        <img class="project-detail-banner" src={project.banner} alt="" width="720" height="360" />
+      </div>
+    )}
+    <header class="project-detail-header">
+      <span class="project-detail-category">{project.category}</span>
+      <div class="project-detail-head-row">
+        <span class={`project-detail-icon bg-gradient-to-br ${project.color}`} aria-hidden="true">{project.icon}</span>
+        <div class="project-detail-head-text">
+          <h1 class="project-detail-title">{project.name}</h1>
+          <p class="project-detail-tagline">{project.tagline}</p>
+        </div>
+      </div>
+    </header>
+    <div class="project-detail-body">
+      <p class="project-detail-desc">{project.description}</p>
+      {project.pageComponent && (
+        <div class="project-detail-content">
+          <ProjectPageContent component={project.pageComponent} />
+        </div>
+      )}
+      {!project.pageComponent && project.body && (
+        <div class="project-detail-content">
+          <ProjectBody content={project.body} />
+        </div>
+      )}
+      {project.link && project.link !== '#' && (
+        <a href={project.link} class="project-detail-cta">{project.linkLabel} →</a>
+      )}
+      {project.link === '#' && (
+        <span class="project-detail-cta project-detail-cta-disabled">{project.linkLabel}</span>
+      )}
+    </div>
+  </div>
+) : (
+  <div class="project-detail">
+    <a href="/projects" class="project-detail-back">← 프로젝트 목록</a>
+    <p class="project-detail-404">해당 프로젝트를 찾을 수 없습니다.</p>
+  </div>
+)}

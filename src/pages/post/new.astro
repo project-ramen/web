@@ -1,0 +1,9 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import NewPostPage from '../../components/NewPostPage';
+
+export const prerender = false;
+---
+<Layout title="새 포스트 | Ramen Blog">
+  <NewPostPage client:load />
+</Layout>

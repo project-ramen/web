@@ -1,0 +1,16 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PostDetailPage from '../../components/PostDetailPage';
+
+export const prerender = false;
+
+const { slug } = Astro.params ?? {};
+---
+<Layout title={slug ? `POST: ${slug} | Ramen Blog` : 'POST | Ramen Blog'}>
+  {slug ? (
+    <PostDetailPage client:load slug={slug} />
+  ) : (
+    <p>slug가 없습니다.</p>
+  )}
+</Layout>
+
