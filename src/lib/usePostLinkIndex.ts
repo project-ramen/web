@@ -23,9 +23,11 @@ export function usePostLinkIndex() {
 
     async function load() {
       try {
+        // cache: 'no-store' — 브라우저/중간 캐시가 이전 published 상태를 들고 있으면
+        // 방금 공개로 전환한 글의 위키링크가 안 걸리는 문제가 생길 수 있어 항상 최신 상태를 받는다.
         const [posts, projects] = await Promise.all([
-          fetch(`${base}/api/posts`).then((r) => (r.ok ? r.json() : [])),
-          fetch(`${base}/api/posts/projects`).then((r) => (r.ok ? r.json() : [])),
+          fetch(`${base}/api/posts`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : [])),
+          fetch(`${base}/api/posts/projects`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : [])),
         ]);
         if (cancelled) return;
 

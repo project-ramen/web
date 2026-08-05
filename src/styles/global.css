@@ -249,6 +249,137 @@ html.dark {
   text-decoration: underline;
 }
 
+/* Obsidian 콜아웃 (`> [!info] 제목`) */
+.markdown-content .callout {
+  border-radius: 0.375rem;
+  border-left: 4px solid var(--callout-color);
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+}
+.markdown-content .callout-title {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 700;
+  color: var(--callout-color);
+}
+.markdown-content .callout-title[data-callout-label]::before {
+  content: attr(data-callout-label);
+}
+.markdown-content .callout-content {
+  margin-top: 0.5rem;
+}
+.markdown-content .callout-content > :first-child {
+  margin-top: 0;
+}
+.markdown-content .callout-content > :last-child {
+  margin-bottom: 0;
+}
+.markdown-content details.callout > summary.callout-title {
+  cursor: pointer;
+  list-style: none;
+}
+.markdown-content details.callout > summary.callout-title::-webkit-details-marker {
+  display: none;
+}
+.markdown-content details.callout > summary.callout-title::after {
+  content: '▸';
+  margin-left: auto;
+  font-weight: 400;
+  transition: transform 0.15s ease;
+}
+.markdown-content details.callout[open] > summary.callout-title::after {
+  transform: rotate(90deg);
+}
+
+.markdown-content .callout-note,
+.markdown-content .callout-quote {
+  --callout-color: #6b7280;
+  background: rgba(107, 114, 128, 0.08);
+}
+.markdown-content .callout-abstract {
+  --callout-color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.08);
+}
+.markdown-content .callout-info {
+  --callout-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+}
+.markdown-content .callout-todo {
+  --callout-color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+}
+.markdown-content .callout-tip {
+  --callout-color: #14b8a6;
+  background: rgba(20, 184, 166, 0.08);
+}
+.markdown-content .callout-success {
+  --callout-color: #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+}
+.markdown-content .callout-question {
+  --callout-color: #eab308;
+  background: rgba(234, 179, 8, 0.08);
+}
+.markdown-content .callout-warning {
+  --callout-color: #f97316;
+  background: rgba(249, 115, 22, 0.08);
+}
+.markdown-content .callout-failure {
+  --callout-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+.markdown-content .callout-danger {
+  --callout-color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+.markdown-content .callout-bug {
+  --callout-color: #f43f5e;
+  background: rgba(244, 63, 94, 0.08);
+}
+.markdown-content .callout-example {
+  --callout-color: #a855f7;
+  background: rgba(168, 85, 247, 0.08);
+}
+
+.dark .markdown-content .callout-note,
+.dark .markdown-content .callout-quote {
+  background: rgba(107, 114, 128, 0.15);
+}
+.dark .markdown-content .callout-abstract {
+  background: rgba(14, 165, 233, 0.15);
+}
+.dark .markdown-content .callout-info {
+  background: rgba(59, 130, 246, 0.15);
+}
+.dark .markdown-content .callout-todo {
+  background: rgba(99, 102, 241, 0.15);
+}
+.dark .markdown-content .callout-tip {
+  background: rgba(20, 184, 166, 0.15);
+}
+.dark .markdown-content .callout-success {
+  background: rgba(34, 197, 94, 0.15);
+}
+.dark .markdown-content .callout-question {
+  background: rgba(234, 179, 8, 0.15);
+}
+.dark .markdown-content .callout-warning {
+  background: rgba(249, 115, 22, 0.15);
+}
+.dark .markdown-content .callout-failure {
+  background: rgba(239, 68, 68, 0.15);
+}
+.dark .markdown-content .callout-danger {
+  background: rgba(220, 38, 38, 0.15);
+}
+.dark .markdown-content .callout-bug {
+  background: rgba(244, 63, 94, 0.15);
+}
+.dark .markdown-content .callout-example {
+  background: rgba(168, 85, 247, 0.15);
+}
+
 /* Project 카드 — /project 목록의 수동 프로젝트 + 태그 기반 자동 프로젝트가 공유 (Astro scoped style로는
    React가 렌더링하는 카드에 적용되지 않아 global로 둔다) */
 .project-row {

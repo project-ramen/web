@@ -6,6 +6,7 @@ import rehypeSlug from 'rehype-slug';
 import type { Components } from 'react-markdown';
 import { CodeBlockWithCopy } from './CodeBlockWithCopy';
 import remarkWikilinks from '../lib/remarkWikilinks';
+import remarkCallouts from '../lib/remarkCallouts';
 import { usePostLinkIndex } from '../lib/usePostLinkIndex';
 
 /** Parse title "width:50%" or "width: 200px" → style (same as app). */
@@ -42,7 +43,7 @@ export default function ProjectBody({ content }: ProjectBodyProps) {
   const { resolve } = usePostLinkIndex();
   return (
     <div className="project-body-markdown markdown-content">
-      <ReactMarkdown remarkPlugins={[remarkGfm, [remarkWikilinks, { resolve }]]} rehypePlugins={[rehypeRaw, rehypeSlug, rehypeHighlight]} components={markdownComponents}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkCallouts, [remarkWikilinks, { resolve }]]} rehypePlugins={[rehypeRaw, rehypeSlug, rehypeHighlight]} components={markdownComponents}>
         {content}
       </ReactMarkdown>
     </div>
