@@ -6,9 +6,15 @@ import GithubSlugger from 'github-slugger';
 /** Obsidian wikilink: [[파일 이름]], [[파일 이름|별칭]], [[파일 이름#헤딩]], [[#헤딩]](같은 문서) 등. */
 const WIKILINK_RE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 
+export interface ResolvedWikilink {
+	href: string;
+	/** hover 시 title 속성으로 보여줄 대상 글의 실제 제목 (별칭과 다를 수 있음) */
+	title: string;
+}
+
 export interface WikilinkOptions {
 	/** notePart(파일 이름/노트 제목, `#헤딩` 제외)를 블로그 내부 URL로 변환. 못 찾으면 undefined → 일반 텍스트로 표시 */
-	resolve?: (notePart: string) => string | undefined;
+	resolve?: (notePart: string) => ResolvedWikilink | undefined;
 }
 
 /** "test#Section" → { notePart: "test", headingText: "Section" }. 블록 참조(^id)는 앵커 없이 노트만 링크. */
@@ -62,8 +68,11 @@ const remarkWikilinks: Plugin<[WikilinkOptions?], Root> = (options = {}) => (tre
 			const displayText = (alias ?? (notePart || headingText || rawTarget)).trim();
 
 			let href: string | undefined;
+			let title: string | undefined;
 			if (notePart) {
-				href = resolve?.(notePart);
+				const resolved = resolve?.(notePart);
+				href = resolved?.href;
+				title = resolved?.title;
 				if (href && headingText) href += `#${new GithubSlugger().slug(headingText)}`;
 			} else if (headingText) {
 				// 노트 이름 없는 [[#헤딩]] — 지금 렌더링 중인 문서 자신을 가리킴
@@ -74,6 +83,7 @@ const remarkWikilinks: Plugin<[WikilinkOptions?], Root> = (options = {}) => (tre
 				replacement.push({
 					type: 'link',
 					url: href,
+					title: title ?? null,
 					children: [{ type: 'text', value: displayText }],
 				});
 			} else {

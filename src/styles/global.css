@@ -5,6 +5,9 @@
 .dark .markdown-content pre .hljs,
 .dark .markdown-content .hljs {
   color: #c9d1d9;
+  /* github.min.css(라이트 테마)가 .hljs에 background:#fff를 직접 박아놔서,
+     다크모드에서 글자색만 바꾸면 흰 배경에 밝은 글자로 거의 안 보이게 됨 */
+  background: transparent;
 }
 .dark .markdown-content pre .hljs .hljs-keyword,
 .dark .markdown-content .hljs .hljs-keyword { color: #ff7b72; }
@@ -193,6 +196,11 @@ html.dark {
 .markdown-content ol {
   margin: 0.5rem 0;
   padding-left: 1.5rem;
+  /* Tailwind preflight가 ul/ol에 list-style:none을 기본으로 깔아버려서 되살려줘야 함 */
+  list-style: revert;
+}
+.markdown-content li {
+  margin: 0.25rem 0;
 }
 .markdown-content img {
   max-width: 100%;
