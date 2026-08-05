@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg id="_레이어_1" data-name="레이어 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6145.55 4274.16">
+<svg id="_레이어_1" data-name="레이어 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 500 6145.55 4274.16">
   <defs>
     <style>
       .floor-cls-1 {
@@ -11,15 +11,16 @@
       }
 
       .floor-cls-2 {
-        stroke-width: 16px;
+        stroke-width: 4px;
       }
 
       .floor-cls-2, .floor-cls-3 {
         fill: none;
         stroke: #120000;
         stroke-miterlimit: 10;
+        vector-effect: non-scaling-stroke;
       }
-      
+
 
       .floor-cls-3 {
         stroke-width: 16px;

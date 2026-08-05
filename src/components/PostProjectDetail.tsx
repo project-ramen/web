@@ -10,6 +10,7 @@ type ProjectPost = {
   tags: string[];
   category: string[];
   banner?: string | null;
+  banner_url?: string | null;
   deleted?: boolean;
   deleted_at?: string | null;
 };
@@ -63,6 +64,7 @@ export default function PostProjectDetail({ slug }: Props) {
           tags,
           category: parseJsonArray(rawPost.category),
           banner: typeof rawPost.banner === 'string' && rawPost.banner ? rawPost.banner : null,
+          banner_url: typeof rawPost.banner_url === 'string' && rawPost.banner_url ? rawPost.banner_url : null,
         });
       })
       .catch(() => {
@@ -94,27 +96,26 @@ export default function PostProjectDetail({ slug }: Props) {
     );
   }
 
-  const category = post.category.length > 0 ? post.category.join(' · ') : 'POST';
-  const tagline = post.tags.join(', ');
-
   return (
     <div className="project-detail">
       <a href="/projects" className="project-detail-back">← 프로젝트 목록</a>
       {post.banner && (
         <div className="project-detail-banner-wrap">
-          <img className="project-detail-banner" src={post.banner} alt="" width="720" height="360" />
+          {post.banner_url ? (
+            <a
+              href={post.banner_url}
+              className="project-detail-banner-link"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={post.title}
+            >
+              <img className="project-detail-banner" src={post.banner} alt="" width="720" height="360" />
+            </a>
+          ) : (
+            <img className="project-detail-banner" src={post.banner} alt="" width="720" height="360" />
+          )}
         </div>
       )}
-      <header className="project-detail-header">
-        <span className="project-detail-category">{category}</span>
-        <div className="project-detail-head-row">
-          <span className="project-detail-icon bg-gradient-to-br from-neutral-400 to-neutral-600" aria-hidden="true">📝</span>
-          <div className="project-detail-head-text">
-            <h1 className="project-detail-title">{post.title}</h1>
-            {tagline && <p className="project-detail-tagline">{tagline}</p>}
-          </div>
-        </div>
-      </header>
       <div className="project-detail-content">
         <ProjectBody content={post.body_md} />
       </div>
