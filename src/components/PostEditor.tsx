@@ -5,6 +5,7 @@ import rehypeHighlight from 'rehype-highlight';
 import { TbBold, TbItalic, TbH1, TbBlockquote, TbLink, TbCode, TbList, TbListNumbers, TbListCheck, TbPhoto } from 'react-icons/tb';
 import { getApiBase } from '../lib/apiBase';
 import { setAdminPassword } from '../lib/adminAuth';
+import remarkWikilinks from '../lib/remarkWikilinks';
 
 export type PostEditorSaved = {
   slug: string;
@@ -418,7 +419,7 @@ export default function PostEditor({ mode, initial, onCancel, onSaved }: PostEdi
             <div className="flex-1 min-h-[380px] overflow-y-auto p-3">
               {body.trim() ? (
                 <article className="markdown-content leading-[1.7] flow-root">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkWikilinks]} rehypePlugins={[rehypeHighlight]}>
                     {body}
                   </ReactMarkdown>
                 </article>

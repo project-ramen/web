@@ -4,6 +4,7 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import type { Components } from 'react-markdown';
 import { CodeBlockWithCopy } from './CodeBlockWithCopy';
+import remarkWikilinks from '../lib/remarkWikilinks';
 
 /** Parse title "width:50%" or "width: 200px" → style (same as app). */
 function imageWidthStyle(title: string | undefined): React.CSSProperties | undefined {
@@ -38,7 +39,7 @@ interface ProjectBodyProps {
 export default function ProjectBody({ content }: ProjectBodyProps) {
   return (
     <div className="project-body-markdown markdown-content">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, rehypeHighlight]} components={markdownComponents}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkWikilinks]} rehypePlugins={[rehypeRaw, rehypeHighlight]} components={markdownComponents}>
         {content}
       </ReactMarkdown>
     </div>

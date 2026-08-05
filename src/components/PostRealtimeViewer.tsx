@@ -7,6 +7,7 @@ import rehypeRaw from 'rehype-raw';
 import type { Components } from 'react-markdown';
 import { CodeBlockWithCopy } from './CodeBlockWithCopy';
 import { getApiBase } from '../lib/apiBase';
+import remarkWikilinks from '../lib/remarkWikilinks';
 
 /** Parse title "width:50%" → style (same as app). */
 function imageWidthStyle(title: string | undefined): React.CSSProperties | undefined {
@@ -585,7 +586,7 @@ export default function PostRealtimeViewer({
         <div ref={wrapRef} className="relative flex-1 min-w-0">
         <article ref={contentArticleRef} className={`flow-root ${viewerContentProse}`}>
           {content ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, rehypeHighlight]} components={markdownComponents}>{content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkWikilinks]} rehypePlugins={[rehypeRaw, rehypeHighlight]} components={markdownComponents}>{content}</ReactMarkdown>
           ) : (
             <p className="empty">아직 내용이 없습니다. 글쓰기 앱에서 이 포스트를 열어 작성해 보세요.</p>
           )}
@@ -619,7 +620,7 @@ export default function PostRealtimeViewer({
             className={`viewer-content selection-mirror-hidden absolute left-0 top-0 invisible pointer-events-none w-full h-0 overflow-hidden ${viewerContentProse}`}
             aria-hidden
           >
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, rehypeHighlight]} components={markdownComponents}>{content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkWikilinks]} rehypePlugins={[rehypeRaw, rehypeHighlight]} components={markdownComponents}>{content}</ReactMarkdown>
           </div>
         ) : null}
         {selectionMenu && postId != null && (
