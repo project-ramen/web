@@ -2,10 +2,12 @@ import { useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import rehypeSlug from 'rehype-slug';
 import { TbBold, TbItalic, TbH1, TbBlockquote, TbLink, TbCode, TbList, TbListNumbers, TbListCheck, TbPhoto } from 'react-icons/tb';
 import { getApiBase } from '../lib/apiBase';
 import { setAdminPassword } from '../lib/adminAuth';
 import remarkWikilinks from '../lib/remarkWikilinks';
+import { usePostLinkIndex } from '../lib/usePostLinkIndex';
 
 export type PostEditorSaved = {
   slug: string;
@@ -158,6 +160,7 @@ const TOOLBAR_ITEMS: { action: ToolbarAction; label: string; Icon: typeof TbBold
 ];
 
 export default function PostEditor({ mode, initial, onCancel, onSaved }: PostEditorProps) {
+  const { resolve: resolveWikilink } = usePostLinkIndex();
   const [title, setTitle] = useState(initial?.title ?? '');
   const [slug, setSlug] = useState(initial?.slug ?? '');
   const [slugTouched, setSlugTouched] = useState(mode === 'edit');
@@ -419,7 +422,7 @@ export default function PostEditor({ mode, initial, onCancel, onSaved }: PostEdi
             <div className="flex-1 min-h-[380px] overflow-y-auto p-3">
               {body.trim() ? (
                 <article className="markdown-content leading-[1.7] flow-root">
-                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkWikilinks]} rehypePlugins={[rehypeHighlight]}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm, [remarkWikilinks, { resolve: resolveWikilink }]]} rehypePlugins={[rehypeSlug, rehypeHighlight]}>
                     {body}
                   </ReactMarkdown>
                 </article>
