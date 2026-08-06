@@ -36,7 +36,7 @@ const isAbout = pathname === '/about' || pathname.startsWith('/about/');
   </head>
   <body class="min-h-screen m-0 font-sans text-neutral-900 dark:text-neutral-100 bg-neutral-50 dark:bg-neutral-800 transition-colors overflow-x-hidden">
     <div class={`grid grid-rows-[auto_1fr_auto] ${isHome ? 'h-screen overflow-hidden' : 'min-h-screen'} items-center justify-items-center gap-0 sm:gap-8 sm:py-8 sm:px-8 md:pt-10 md:px-10 bg-web`} id="layout-container">
-      <header class="sticky top-0 z-30 bg-web w-full max-w-[720px] min-w-0 px-4 py-4">
+      <header id="site-header" class="sticky top-0 z-30 bg-web w-full max-w-[720px] min-w-0 px-4 py-4">
         <nav class="flex flex-wrap items-center justify-between gap-3 sm:gap-8 text-base sm:text-lg font-medium" aria-label="메인 메뉴">
           <div class="flex flex-wrap items-center gap-4 sm:gap-8 min-w-0" id="nav-links">
             <a href="/post" data-route="post" class={`nav-link text-neutral-900 dark:text-neutral-100 no-underline hover:underline underline-offset-2 ${isPost ? 'font-semibold underline' : ''}`}>Post</a>
@@ -66,7 +66,7 @@ const isAbout = pathname === '/about' || pathname.startsWith('/about/');
             </div>
           </div>
         )}
-        <div class={`relative z-20 w-full min-h-full ${isHome ? '' : 'p-4 bg-neutral-50 dark:bg-neutral-800 rounded-none sm:rounded-2xl'}`}>
+        <div id="page-slot" class={`relative z-20 w-full min-h-full ${isHome ? '' : 'p-4 bg-neutral-50 dark:bg-neutral-800 rounded-none sm:rounded-2xl'}`}>
           <slot/>
         </div>
         <div class={`fixed top-1/2 left-[calc(50%-360px)] translate-x-[-100%] -translate-y-1/2 z-20 pointer-events-none ${isHome ? "hidden" : "hidden min-[850px]:block"}`}>

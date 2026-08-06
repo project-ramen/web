@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { FiMessageCircle, FiHeart, FiX, FiArrowLeft, FiEdit2, FiTrash2, FiMessageSquare } from 'react-icons/fi';
-import { TbArrowsSort } from 'react-icons/tb';
+import { TbArrowsSort, TbList } from 'react-icons/tb';
 import PostRealtimeViewer, { type AnchorComment } from './PostRealtimeViewer';
 import CommentForm from './CommentForm';
 import PasswordConfirmModal from './PasswordConfirmModal';
@@ -65,6 +65,8 @@ function setStoredLike(postId: number, liked: boolean) {
 }
 
 export default function PostDetailPage({ slug }: Props) {
+  const [headings, setHeadings] = useState<{ id: string; text: string; level: number }[]>([]);
+  const [mobileTocOpen, setMobileTocOpen] = useState(false);
   const [post, setPost] = useState<Post | DeletedPost | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,6 +139,16 @@ export default function PostDetailPage({ slug }: Props) {
     const next = !liked;
     setLiked(next);
     setStoredLike(post.id, next);
+  };
+
+  const scrollToHeading = (id: string) => {
+    const target = document.getElementById(id);
+    if (!target) return;
+    const stickyHeader = document.getElementById('site-header');
+    const offset = (stickyHeader?.getBoundingClientRect().height ?? 0) + 16;
+    const top = target.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top, behavior: 'smooth' });
+    setMobileTocOpen(false);
   };
 
   const backLink = (
@@ -268,6 +280,7 @@ export default function PostDetailPage({ slug }: Props) {
         initialContent={normalPost.body_md ?? ''}
         postId={post.id}
         anchorComments={anchorComments}
+        onHeadingsChange={setHeadings}
         onSelectionCommentSuccess={() => fetchComments(slug)}
         onEditAnchorComment={(commentId) => {
           setCommentPopupOpen(true);
@@ -299,6 +312,10 @@ export default function PostDetailPage({ slug }: Props) {
         liked={liked}
         onCommentClick={() => setCommentPopupOpen(true)}
         onLikeClick={toggleLike}
+        headings={headings}
+        mobileTocOpen={mobileTocOpen}
+        onToggleToc={() => setMobileTocOpen((o) => !o)}
+        onHeadingClick={scrollToHeading}
       />
     </div>
   );
@@ -637,42 +654,102 @@ type FloatingPillProps = {
   liked: boolean;
   onCommentClick: () => void;
   onLikeClick: () => void;
+  headings?: { id: string; text: string; level: number }[];
+  mobileTocOpen?: boolean;
+  onToggleToc?: () => void;
+  onHeadingClick?: (id: string) => void;
 };
 
-function FloatingPill({ commentCount, liked, onCommentClick, onLikeClick }: FloatingPillProps) {
+function FloatingPill({
+  commentCount,
+  liked,
+  onCommentClick,
+  onLikeClick,
+  headings = [],
+  mobileTocOpen = false,
+  onToggleToc,
+  onHeadingClick,
+}: FloatingPillProps) {
+  const pillRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!mobileTocOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (!pillRef.current?.contains(e.target as Node)) {
+        onToggleToc?.();
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [mobileTocOpen, onToggleToc]);
+
   return (
-    <div
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 rounded-full bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md border border-neutral-200/80 dark:border-neutral-700/80 shadow-[0_4px_20px_rgba(0,0,0,0.08),0_8px_32px_rgba(0,0,0,0.12)] px-4 py-1.5 sm:bottom-6 sm:px-5 max-w-[calc(100vw-2rem)]"
-      role="group"
-      aria-label="댓글 및 좋아요"
-    >
-      <button
-        type="button"
-        onClick={onCommentClick}
-        className="flex items-center gap-2 min-w-0 rounded-full py-1 px-3 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
-        aria-label={`댓글 ${commentCount}개`}
+    <div ref={pillRef} className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 sm:bottom-6">
+      {mobileTocOpen && headings.length > 0 && (
+        <div className="lg:hidden absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 max-w-[calc(100vw-2rem)] max-h-[50vh] overflow-y-auto rounded-xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200/80 dark:border-neutral-700/80 shadow-[0_4px_20px_rgba(0,0,0,0.08),0_8px_32px_rgba(0,0,0,0.12)] py-1.5">
+          {headings.map((h) => (
+            <a
+              key={h.id}
+              href={`#${h.id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                onHeadingClick?.(h.id);
+              }}
+              className="block truncate py-1.5 pr-3 no-underline text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-100"
+              style={{ paddingLeft: `${0.75 + (h.level - 1) * 0.75}rem` }}
+            >
+              {h.text}
+            </a>
+          ))}
+        </div>
+      )}
+      <div
+        className="relative flex items-center gap-1 rounded-full bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md border border-neutral-200/80 dark:border-neutral-700/80 shadow-[0_4px_20px_rgba(0,0,0,0.08),0_8px_32px_rgba(0,0,0,0.12)] px-4 py-1.5 sm:px-5 max-w-[calc(100vw-2rem)]"
+        role="group"
+        aria-label="댓글 및 좋아요"
       >
-        <FiMessageCircle className="shrink-0 w-5 h-5" aria-hidden />
-        <span className="text-sm font-medium tabular-nums">{commentCount}</span>
-      </button>
-      <span className="w-px h-5 bg-neutral-200 dark:bg-neutral-600" aria-hidden />
-      <button
-        type="button"
-        onClick={onLikeClick}
-        className={`flex items-center gap-2 min-w-0 rounded-full py-1 px-3 transition-colors ${
-          liked
-            ? 'text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40'
-            : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-700 dark:hover:text-neutral-300'
-        }`}
-        aria-label={liked ? '좋아요 취소' : '좋아요'}
-        aria-pressed={liked}
-      >
-        <FiHeart
-          className={`shrink-0 w-5 h-5 ${liked ? 'fill-current' : ''}`}
-          aria-hidden
-        />
-        <span className="text-sm font-medium">{liked ? '1' : '0'}</span>
-      </button>
+        {headings.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={onToggleToc}
+              className="lg:hidden flex items-center gap-2 min-w-0 rounded-full py-1 px-3 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+              aria-label="목차"
+              aria-expanded={mobileTocOpen}
+            >
+              <TbList className="shrink-0 w-5 h-5" aria-hidden />
+            </button>
+            <span className="lg:hidden w-px h-5 bg-neutral-200 dark:bg-neutral-600" aria-hidden />
+          </>
+        )}
+        <button
+          type="button"
+          onClick={onCommentClick}
+          className="flex items-center gap-2 min-w-0 rounded-full py-1 px-3 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+          aria-label={`댓글 ${commentCount}개`}
+        >
+          <FiMessageCircle className="shrink-0 w-5 h-5" aria-hidden />
+          <span className="text-sm font-medium tabular-nums">{commentCount}</span>
+        </button>
+        <span className="w-px h-5 bg-neutral-200 dark:bg-neutral-600" aria-hidden />
+        <button
+          type="button"
+          onClick={onLikeClick}
+          className={`flex items-center gap-2 min-w-0 rounded-full py-1 px-3 transition-colors ${
+            liked
+              ? 'text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+              : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-700 dark:hover:text-neutral-300'
+          }`}
+          aria-label={liked ? '좋아요 취소' : '좋아요'}
+          aria-pressed={liked}
+        >
+          <FiHeart
+            className={`shrink-0 w-5 h-5 ${liked ? 'fill-current' : ''}`}
+            aria-hidden
+          />
+          <span className="text-sm font-medium">{liked ? '1' : '0'}</span>
+        </button>
+      </div>
     </div>
   );
 }

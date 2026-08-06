@@ -215,6 +215,8 @@ export type PostRealtimeViewerProps = {
   onSelectionCommentSuccess?: () => void;
   onEditAnchorComment?: (commentId: number) => void;
   onDeleteAnchorComment?: (commentId: number) => void;
+  /** 본문에서 추출된 헤딩 목록이 바뀔 때 호출 (모바일 플로팅 목차 버튼 등에서 사용) */
+  onHeadingsChange?: (headings: { id: string; text: string; level: number }[]) => void;
 };
 
 /** raw 인덱스 → 렌더된 인덱스 (rawIndexForRendered[i] <= raw 인 최대 i) */
@@ -260,6 +262,7 @@ export default function PostRealtimeViewer({
   onSelectionCommentSuccess,
   onEditAnchorComment,
   onDeleteAnchorComment,
+  onHeadingsChange,
 }: PostRealtimeViewerProps) {
   const [content, setContent] = useState(initialContent);
   const { resolve: resolveWikilink } = usePostLinkIndex();
@@ -288,6 +291,9 @@ export default function PostRealtimeViewer({
   const [selectionCommentError, setSelectionCommentError] = useState('');
   const [nicknameEditing, setNicknameEditing] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [headings, setHeadings] = useState<{ id: string; text: string; level: number }[]>([]);
+  const [tocTop, setTocTop] = useState(0);
+  const [tocReady, setTocReady] = useState(false);
   const selectionCommentTextareaRef = useRef<HTMLTextAreaElement>(null);
   const contentArticleRef = useRef<HTMLElement>(null);
   const selectionMirrorRef = useRef<HTMLDivElement>(null);
@@ -586,11 +592,94 @@ export default function PostRealtimeViewer({
     }
   }, [content, hoveredAnchorRange]);
 
+  // 렌더된 본문에서 헤딩(rehype-slug가 id를 붙여둠) 목록을 뽑아 우측 목차 바에 씀
+  useEffect(() => {
+    const article = contentArticleRef.current;
+    if (!article) {
+      setHeadings([]);
+      return;
+    }
+    const nodes = article.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    setHeadings(
+      Array.from(nodes)
+        .filter((el) => el.id)
+        .map((el) => ({
+          id: el.id,
+          text: el.textContent ?? '',
+          level: Number(el.tagName[1]),
+        }))
+    );
+  }, [content]);
+
+  // 목차 pill의 상단(바깥 테두리)을 페이지 최초 로딩 시 블로그 포스트 슬롯(Layout.astro의 #page-slot)의
+  // y 좌표에 맞춤 (fixed이므로 이후 스크롤해도 그 자리 유지). 폰트 로딩 등으로 레이아웃이 밀리는
+  // 것까지 반영되도록 페이지 로딩이 끝난 뒤 위치를 계산하고, 그 전까지는 표시하지 않음
+  useEffect(() => {
+    if (headings.length === 0) return;
+    let cancelled = false;
+    const measure = () => {
+      if (cancelled) return;
+      const anchor = document.getElementById('page-slot') ?? contentArticleRef.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      setTocTop(Math.max(24, rect.top));
+      setTocReady(true);
+    };
+    if (document.readyState === 'complete') {
+      measure();
+    } else {
+      window.addEventListener('load', measure, { once: true });
+    }
+    return () => {
+      cancelled = true;
+      window.removeEventListener('load', measure);
+    };
+  }, [headings.length]);
+
+  // 헤딩 목록을 부모(모바일 플로팅 목차 버튼용)에도 전달
+  useEffect(() => {
+    onHeadingsChange?.(headings);
+  }, [headings, onHeadingsChange]);
+
+  const scrollToHeading = (id: string) => {
+    const target = document.getElementById(id);
+    if (!target) return;
+    const stickyHeader = document.getElementById('site-header');
+    const offset = (stickyHeader?.getBoundingClientRect().height ?? 0) + 16;
+    const top = target.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top, behavior: 'smooth' });
+  };
+
   const viewerContentProse =
     'leading-[1.7] markdown-content [&_.empty]:text-gray-400 [&_.empty]:italic';
 
   return (
     <div className="mt-4">
+      {headings.length > 0 && (
+        <div
+          className={`fixed left-[calc(50%+360px+28px)] z-20 hidden lg:flex flex-col items-start py-3 px-2.5 rounded-full bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm border border-neutral-200 dark:border-neutral-700 shadow-sm max-h-[70vh] transition-opacity duration-300 ${tocReady ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          style={{ top: `${tocTop}px` }}
+          aria-label="목차"
+        >
+          {headings.map((h) => (
+            <a
+              key={h.id}
+              href={`#${h.id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                scrollToHeading(h.id);
+              }}
+              className="group relative flex items-center py-1.5"
+              style={{ width: `${Math.max(6, 22 - (h.level - 1) * 4)}px` }}
+            >
+              <span className="block h-[2px] w-full rounded-full bg-neutral-300 dark:bg-neutral-600 group-hover:bg-[#879e82] dark:group-hover:bg-[#879e82] transition-colors" />
+              <span className="pointer-events-none absolute right-full top-1/2 -translate-y-1/2 mr-2 whitespace-nowrap rounded-md bg-neutral-900 dark:bg-neutral-100 px-2 py-1 text-xs text-neutral-100 dark:text-neutral-900 opacity-0 group-hover:opacity-100 transition-opacity">
+                {h.text}
+              </span>
+            </a>
+          ))}
+        </div>
+      )}
       <div className="flex items-stretch gap-0">
         <div ref={wrapRef} className="relative flex-1 min-w-0">
         <article ref={contentArticleRef} className={`flow-root ${viewerContentProse}`}>
