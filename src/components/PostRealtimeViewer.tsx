@@ -1,5 +1,6 @@
 import { useEffect, useState, useLayoutEffect, useRef } from 'react';
-import { FiAtSign, FiChevronDown, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { FiAtSign, FiChevronDown, FiEdit2, FiTrash2, FiX } from 'react-icons/fi';
+import { TbBold, TbItalic, TbUnderline } from 'react-icons/tb';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -7,10 +8,13 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSlug from 'rehype-slug';
 import type { Components } from 'react-markdown';
 import { CodeBlockWithCopy } from './CodeBlockWithCopy';
+import PasswordConfirmModal from './PasswordConfirmModal';
 import { getApiBase } from '../lib/apiBase';
 import remarkWikilinks from '../lib/remarkWikilinks';
 import remarkCallouts from '../lib/remarkCallouts';
 import { usePostLinkIndex } from '../lib/usePostLinkIndex';
+import { wrapSelection } from '../lib/textareaFormatting';
+import { renderInlineFormatting } from '../lib/renderInlineFormatting';
 
 /** Parse title "width:50%" → style (same as app). */
 function imageWidthStyle(title: string | undefined): React.CSSProperties | undefined {
@@ -279,11 +283,12 @@ export default function PostRealtimeViewer({
   } | null>(null);
   const [selectionCommentDraft, setSelectionCommentDraft] = useState('');
   const [selectionCommentNickname, setSelectionCommentNickname] = useState('');
-  const [selectionCommentPassword, setSelectionCommentPassword] = useState('');
-  const [selectionCommentPasswordConfirm, setSelectionCommentPasswordConfirm] = useState('');
   const [selectionCommentSending, setSelectionCommentSending] = useState(false);
   const [selectionFormOpen, setSelectionFormOpen] = useState(false);
   const [selectionCommentError, setSelectionCommentError] = useState('');
+  const [nicknameEditing, setNicknameEditing] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const selectionCommentTextareaRef = useRef<HTMLTextAreaElement>(null);
   const contentArticleRef = useRef<HTMLElement>(null);
   const selectionMirrorRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -371,10 +376,10 @@ export default function PostRealtimeViewer({
         });
         setSelectionCommentDraft('');
         setSelectionCommentNickname('');
-        setSelectionCommentPassword('');
-        setSelectionCommentPasswordConfirm('');
         setSelectionFormOpen(false);
         setSelectionCommentError('');
+        setNicknameEditing(false);
+        setPasswordModalOpen(false);
       };
       requestAnimationFrame(() => {
         requestAnimationFrame(runAfterClickSettle);
@@ -653,122 +658,166 @@ export default function PostRealtimeViewer({
                 className="selection-comment-form absolute left-0 right-0 z-10 w-full mt-2"
                 style={{ top: selectionMenu.bottom + 8 }}
               >
-                <div className="flex flex-col gap-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-600 rounded-md p-2 shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)] w-full">
-                  <textarea
-                    className="w-full py-1.5 px-1.5 border border-neutral-200 dark:border-neutral-500 rounded font-sans text-sm resize-y bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
-                    value={selectionCommentDraft}
-                    onChange={(e) => setSelectionCommentDraft(e.target.value)}
-                    placeholder="댓글 입력..."
-                    rows={2}
-                    disabled={selectionCommentSending}
-                  />
-                  <input
-                    type="text"
-                    className="w-full py-1.5 px-1.5 border border-neutral-200 dark:border-neutral-500 rounded font-sans text-sm bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
-                    value={selectionCommentNickname}
-                    onChange={(e) => setSelectionCommentNickname(e.target.value)}
-                    placeholder="닉네임 (선택)"
-                    disabled={selectionCommentSending}
-                    maxLength={24}
-                  />
-                  <div className="flex flex-row gap-2">
-                    <input
-                      type="password"
-                      className="flex-1 min-w-0 py-1.5 px-1.5 border border-neutral-200 dark:border-neutral-500 rounded font-sans text-sm bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
-                      value={selectionCommentPassword}
-                      onChange={(e) => setSelectionCommentPassword(e.target.value)}
-                      placeholder="비밀번호"
-                      disabled={selectionCommentSending}
-                      autoComplete="new-password"
-                    />
-                    <input
-                      type="password"
-                      className="flex-1 min-w-0 py-1.5 px-1.5 border border-neutral-200 dark:border-neutral-500 rounded font-sans text-sm bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
-                      value={selectionCommentPasswordConfirm}
-                      onChange={(e) => setSelectionCommentPasswordConfirm(e.target.value)}
-                      placeholder="비밀번호 확인"
-                      disabled={selectionCommentSending}
-                      autoComplete="new-password"
-                    />
-                  </div>
-                  {selectionCommentError ? (
-                    <p className="text-[0.8125rem] text-red-600 dark:text-red-400">{selectionCommentError}</p>
-                  ) : null}
-                  <div className="flex justify-end gap-2">
+                <div className="flex flex-col gap-1.5 bg-neutral-50 dark:bg-neutral-800 rounded-md p-2 shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)] w-full">
+                  <div className="flex items-center justify-between">
+                    {nicknameEditing ? (
+                      <input
+                        type="text"
+                        autoFocus
+                        className="max-w-[140px] py-0.5 px-1 text-left text-sm font-sans bg-transparent border-0 border-b border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 placeholder:text-neutral-400 focus:outline-none"
+                        value={selectionCommentNickname}
+                        onChange={(e) => setSelectionCommentNickname(e.target.value)}
+                        onBlur={() => setNicknameEditing(false)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            setNicknameEditing(false);
+                          }
+                        }}
+                        placeholder="닉네임"
+                        disabled={selectionCommentSending}
+                        maxLength={24}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setNicknameEditing(true)}
+                        className="py-0.5 px-1 text-sm font-sans bg-transparent border-0 border-b border-transparent cursor-pointer text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
+                      >
+                        {selectionCommentNickname.trim() || '익명'}
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className="py-1.5 px-2.5 text-[0.8125rem] bg-transparent border-none text-neutral-500 dark:text-neutral-400 cursor-pointer font-sans hover:text-neutral-900 dark:hover:text-neutral-100"
                       onClick={() => {
                         setSelectionMenu(null);
                         setSelectionCommentDraft('');
                         setSelectionCommentNickname('');
-                        setSelectionCommentPassword('');
-                        setSelectionCommentPasswordConfirm('');
                         setSelectionFormOpen(false);
                         setSelectionCommentError('');
+                        setNicknameEditing(false);
                       }}
+                      className="p-1.5 -m-1.5 rounded-full text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+                      aria-label="닫기"
                     >
-                      취소
+                      <FiX className="w-4 h-4" />
                     </button>
-                    <button
-                      type="button"
-                      className="py-1.5 px-2.5 text-[0.8125rem] font-sans text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded cursor-pointer hover:enabled:bg-neutral-200 dark:hover:enabled:bg-neutral-600 disabled:opacity-60 disabled:cursor-not-allowed"
-                      disabled={
-                        selectionCommentSending ||
-                        !selectionCommentDraft.trim() ||
-                        !selectionCommentPassword.trim() ||
-                        selectionCommentPassword !== selectionCommentPasswordConfirm
-                      }
-                      onClick={async () => {
-                        if (!getApiBase() || !selectionCommentDraft.trim()) return;
-                        const pw = selectionCommentPassword.trim();
-                        const pwConfirm = selectionCommentPasswordConfirm.trim();
-                        if (!pw) {
-                          setSelectionCommentError('비밀번호를 입력하세요.');
-                          return;
-                        }
-                        if (pw !== pwConfirm) {
-                          setSelectionCommentError('비밀번호가 일치하지 않습니다.');
-                          return;
-                        }
-                        setSelectionCommentError('');
-                        setSelectionCommentSending(true);
-                        try {
-                          const r = await fetch(`${getApiBase()}/api/comments`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              post_id: postId,
-                              post_slug: slug,
-                              content: selectionCommentDraft.trim(),
-                              user_id: selectionCommentNickname.trim() || null,
-                              start_anchor: String(selectionMenu.start),
-                              end_anchor: String(selectionMenu.end),
-                              password: pw,
-                              password_confirm: pwConfirm,
-                            }),
-                          });
-                          const data = await r.json().catch(() => ({}));
-                          if (!r.ok) throw new Error(data?.error || r.statusText);
+                  </div>
+
+                  <div className="relative rounded-md bg-white dark:bg-neutral-900">
+                    <div className="flex items-center gap-0.5 px-1 pt-1">
+                      {(
+                        [
+                          { marker: '**', placeholder: '굵게 강조할 텍스트', label: '굵게', Icon: TbBold },
+                          { marker: '*', placeholder: '기울일 텍스트', label: '기울임', Icon: TbItalic },
+                          { marker: '__', placeholder: '밑줄 그을 텍스트', label: '밑줄', Icon: TbUnderline },
+                        ] as const
+                      ).map(({ marker, placeholder, label, Icon }) => (
+                        <button
+                          key={marker}
+                          type="button"
+                          aria-label={label}
+                          title={label}
+                          disabled={selectionCommentSending}
+                          className="p-1 rounded text-neutral-500 dark:text-neutral-400 bg-transparent border-none cursor-pointer hover:enabled:bg-neutral-100 dark:hover:enabled:bg-neutral-700 hover:enabled:text-neutral-800 dark:hover:enabled:text-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={() => {
+                            const el = selectionCommentTextareaRef.current;
+                            if (!el) return;
+                            wrapSelection(el, selectionCommentDraft, setSelectionCommentDraft, marker, placeholder);
+                          }}
+                        >
+                          <Icon className="w-3.5 h-3.5" aria-hidden />
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      ref={selectionCommentTextareaRef}
+                      className="w-full py-1.5 px-2 pb-9 border-none rounded-md font-sans text-sm resize-none bg-transparent text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 focus:outline-none"
+                      value={selectionCommentDraft}
+                      onChange={(e) => setSelectionCommentDraft(e.target.value)}
+                      placeholder="댓글 입력..."
+                      rows={3}
+                      disabled={selectionCommentSending}
+                    />
+                    <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        className="py-1 px-2 text-[0.8125rem] bg-transparent border-none text-neutral-500 dark:text-neutral-400 cursor-pointer font-sans hover:text-neutral-900 dark:hover:text-neutral-100"
+                        disabled={selectionCommentSending}
+                        onClick={() => {
                           setSelectionMenu(null);
                           setSelectionCommentDraft('');
                           setSelectionCommentNickname('');
-                          setSelectionCommentPassword('');
-                          setSelectionCommentPasswordConfirm('');
                           setSelectionFormOpen(false);
-                          onSelectionCommentSuccess?.();
-                        } catch (err) {
-                          setSelectionCommentError(err instanceof Error ? err.message : '전송에 실패했습니다.');
-                        } finally {
-                          setSelectionCommentSending(false);
-                        }
-                      }}
-                    >
-                      {selectionCommentSending ? '전송 중…' : '등록'}
-                    </button>
+                          setSelectionCommentError('');
+                          setNicknameEditing(false);
+                        }}
+                      >
+                        취소
+                      </button>
+                      <button
+                        type="button"
+                        className="py-1 px-2.5 text-[0.8125rem] font-sans text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded cursor-pointer hover:enabled:bg-neutral-200 dark:hover:enabled:bg-neutral-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                        disabled={selectionCommentSending || !selectionCommentDraft.trim()}
+                        onClick={() => {
+                          if (!getApiBase() || !selectionCommentDraft.trim()) return;
+                          setSelectionCommentError('');
+                          setPasswordModalOpen(true);
+                        }}
+                      >
+                        등록
+                      </button>
+                    </div>
                   </div>
+
+                  {selectionCommentError ? (
+                    <p className="text-[0.8125rem] text-red-600 dark:text-red-400">{selectionCommentError}</p>
+                  ) : null}
                 </div>
               </div>
+            )}
+            {passwordModalOpen && (
+              <PasswordConfirmModal
+                sending={selectionCommentSending}
+                error={selectionCommentError}
+                onCancel={() => {
+                  if (selectionCommentSending) return;
+                  setPasswordModalOpen(false);
+                }}
+                onConfirm={async (pw) => {
+                  if (!getApiBase() || !selectionCommentDraft.trim()) return;
+                  setSelectionCommentError('');
+                  setSelectionCommentSending(true);
+                  try {
+                    const r = await fetch(`${getApiBase()}/api/comments`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        post_id: postId,
+                        post_slug: slug,
+                        content: selectionCommentDraft.trim(),
+                        user_id: selectionCommentNickname.trim() || null,
+                        start_anchor: String(selectionMenu.start),
+                        end_anchor: String(selectionMenu.end),
+                        password: pw,
+                        password_confirm: pw,
+                      }),
+                    });
+                    const data = await r.json().catch(() => ({}));
+                    if (!r.ok) throw new Error(data?.error || r.statusText);
+                    setPasswordModalOpen(false);
+                    setSelectionMenu(null);
+                    setSelectionCommentDraft('');
+                    setSelectionCommentNickname('');
+                    setSelectionFormOpen(false);
+                    onSelectionCommentSuccess?.();
+                  } catch (err) {
+                    setSelectionCommentError(err instanceof Error ? err.message : '전송에 실패했습니다.');
+                  } finally {
+                    setSelectionCommentSending(false);
+                  }
+                }}
+              />
             )}
           </>
         )}
@@ -789,7 +838,7 @@ export default function PostRealtimeViewer({
               const showSnippet = expandedSnippetId === c.id;
               const commentContent = (
                 <>
-                  <p className="m-0 mb-1.5 text-sm leading-normal whitespace-pre-wrap break-words text-neutral-900 dark:text-neutral-100">{c.content || '(내용 없음)'}</p>
+                  <p className="m-0 mb-1.5 text-sm leading-normal whitespace-pre-wrap break-words text-neutral-900 dark:text-neutral-100">{c.content ? renderInlineFormatting(c.content) : '(내용 없음)'}</p>
                   {c.created_at && (
                     <span className="block mt-1 text-xs text-neutral-500 dark:text-neutral-400">{c.created_at}</span>
                   )}

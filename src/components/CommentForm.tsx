@@ -1,5 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { TbBold, TbItalic, TbUnderline } from 'react-icons/tb';
+import { FiX } from 'react-icons/fi';
 import { getApiBase } from '../lib/apiBase';
+import { wrapSelection } from '../lib/textareaFormatting';
+import PasswordConfirmModal from './PasswordConfirmModal';
 
 type Props = {
   postId: number;
@@ -10,9 +14,17 @@ type Props = {
   editCommentId?: number | null;
   initialContent?: string;
   onCancelEdit?: () => void;
-  deleteCommentId?: number | null;
-  onCancelDelete?: () => void;
+  /** 연필 아이콘 클릭 시 이미 비밀번호를 확인해둔 경우 — 있으면 제출할 때 모달 없이 바로 이 비밀번호로 전송 */
+  editVerifiedPassword?: string;
+  /** 있으면 닉네임 라벨과 같은 줄 오른쪽에 닫기(X) 버튼을 렌더링 */
+  onRequestClose?: () => void;
 };
+
+const TOOLBAR_ITEMS = [
+  { marker: '**', placeholder: '굵게 강조할 텍스트', label: '굵게', Icon: TbBold },
+  { marker: '*', placeholder: '기울일 텍스트', label: '기울임', Icon: TbItalic },
+  { marker: '__', placeholder: '밑줄 그을 텍스트', label: '밑줄', Icon: TbUnderline },
+] as const;
 
 export default function CommentForm({
   postId,
@@ -23,68 +35,32 @@ export default function CommentForm({
   editCommentId = null,
   initialContent = '',
   onCancelEdit,
-  deleteCommentId = null,
-  onCancelDelete,
+  editVerifiedPassword,
+  onRequestClose,
 }: Props) {
   const [content, setContent] = useState('');
   const [nickname, setNickname] = useState('');
-  const [password, setPassword] = useState('');
+  const [nicknameEditing, setNicknameEditing] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [status, setStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    setPassword('');
     setErrorMessage('');
-    if (deleteCommentId != null) return;
+    setPasswordModalOpen(false);
+    setNicknameEditing(false);
     if (editCommentId != null) {
       setContent(initialContent);
     } else {
       setContent('');
     }
     setNickname('');
-  }, [deleteCommentId, editCommentId, initialContent, replyToCommentId]);
+  }, [editCommentId, initialContent, replyToCommentId]);
 
-  const submitDelete = (e: React.FormEvent) => {
-    e.preventDefault();
-    const apiUrl = getApiBase();
-    if (deleteCommentId == null || !apiUrl) return;
-    const pw = password.trim();
-    if (!pw) {
-      setErrorMessage('비밀번호를 입력하세요.');
-      return;
-    }
-    setErrorMessage('');
-    setStatus('sending');
-    fetch(`${apiUrl}/api/comments/${deleteCommentId}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw }),
-    })
-      .then(async (r) => {
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error((data && (data as { error?: string }).error) || r.statusText);
-      })
-      .then(() => {
-        setPassword('');
-        setStatus('done');
-        onSuccess?.();
-      })
-      .catch((err) => {
-        setStatus('error');
-        setErrorMessage(err?.message || '삭제에 실패했습니다.');
-      })
-      .finally(() => setStatus((s) => (s === 'sending' ? 'idle' : s)));
-  };
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const doSubmit = (pw: string) => {
     const apiUrl = getApiBase();
     if (!content.trim() || !apiUrl) return;
-    const pw = password.trim();
-    if (!pw) {
-      setErrorMessage('비밀번호를 입력하세요.');
-      return;
-    }
     setErrorMessage('');
     setStatus('sending');
     const normalized = content.trim();
@@ -115,7 +91,7 @@ export default function CommentForm({
       .then(() => {
         setContent('');
         setNickname('');
-        setPassword('');
+        setPasswordModalOpen(false);
         setStatus('done');
         onSuccess?.();
       })
@@ -126,103 +102,136 @@ export default function CommentForm({
       .finally(() => setStatus((s) => (s === 'sending' ? 'idle' : s)));
   };
 
-  if (deleteCommentId != null) {
-    return (
-      <form
-        onSubmit={submitDelete}
-        className="flex flex-col gap-2 [&_label]:text-sm [&_label]:font-sans [&_label]:text-neutral-700 [&_label]:dark:text-neutral-300 [&_input]:w-full [&_input]:!max-w-none [&_input]:p-2 [&_input]:border [&_input]:border-neutral-200 [&_input]:dark:border-neutral-600 [&_input]:rounded-md [&_input]:font-sans [&_input]:bg-white [&_input]:dark:bg-neutral-800 [&_input]:text-neutral-900 [&_input]:dark:text-neutral-100"
-      >
-        <p className="m-0 text-sm text-neutral-600 dark:text-neutral-400">비밀번호를 입력한 뒤 삭제를 눌러주세요.</p>
-        <div className="flex flex-col gap-1">
-          <label htmlFor={`comment-delete-pw-${deleteCommentId}`}>비밀번호</label>
-          <input
-            id={`comment-delete-pw-${deleteCommentId}`}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="비밀번호"
-            disabled={status === 'sending'}
-            autoComplete="current-password"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={status === 'sending' || !password.trim()}
-          className="py-2 px-4 font-sans text-[0.9375rem] text-white bg-red-600 hover:enabled:bg-red-700 border-none rounded-md cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {status === 'sending' ? '삭제 중…' : '삭제하기'}
-        </button>
-        {onCancelDelete ? (
-          <button
-            type="button"
-            onClick={onCancelDelete}
-            className="py-2 px-4 font-sans text-[0.9375rem] text-neutral-500 dark:text-neutral-400 bg-transparent border-none rounded-md cursor-pointer hover:text-neutral-900 dark:hover:text-neutral-100"
-            disabled={status === 'sending'}
-          >
-            삭제 취소
-          </button>
-        ) : null}
-        {status === 'done' && <span className="text-green-600 dark:text-green-400">삭제되었습니다.</span>}
-        {(status === 'error' || errorMessage) && <span className="text-red-600 dark:text-red-400">{errorMessage || '삭제에 실패했습니다.'}</span>}
-      </form>
-    );
-  }
-
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2 [&_textarea]:w-full [&_textarea]:max-w-[480px] [&_textarea]:p-2 [&_textarea]:border [&_textarea]:border-neutral-200 [&_textarea]:dark:border-neutral-600 [&_textarea]:rounded-md [&_textarea]:font-sans [&_textarea]:bg-white [&_textarea]:dark:bg-neutral-800 [&_textarea]:text-neutral-900 [&_textarea]:dark:text-neutral-100 [&_input]:max-w-[280px] [&_input]:p-2 [&_input]:border [&_input]:border-neutral-200 [&_input]:dark:border-neutral-600 [&_input]:rounded-md [&_input]:font-sans [&_input]:bg-white [&_input]:dark:bg-neutral-800 [&_input]:text-neutral-900 [&_input]:dark:text-neutral-100 [&_button]:py-2 [&_button]:px-4 [&_button]:font-sans [&_button]:text-[0.9375rem] [&_button]:text-neutral-900 [&_button]:dark:text-neutral-100 [&_button]:bg-neutral-50 [&_button]:dark:bg-neutral-800 [&_button]:border [&_button]:border-neutral-200 [&_button]:dark:border-neutral-600 [&_button]:rounded-md [&_button]:cursor-pointer [&_button]:transition-colors hover:[&_button]:enabled:bg-neutral-100 hover:[&_button]:enabled:dark:bg-neutral-700 hover:[&_button]:enabled:border-neutral-300 hover:[&_button]:enabled:dark:border-neutral-500 [&_button]:disabled:opacity-60 [&_button]:disabled:cursor-not-allowed">
-      <input
-        type="text"
-        value={nickname}
-        onChange={(e) => setNickname(e.target.value)}
-        placeholder="닉네임 (선택)"
-        disabled={status === 'sending'}
-        maxLength={24}
-        className="w-full !max-w-none"
-      />
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="댓글을 입력하세요."
-        rows={3}
-        disabled={status === 'sending'}
-      />
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-sans text-neutral-700 dark:text-neutral-300">비밀번호</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="비밀번호"
-          disabled={status === 'sending'}
-          className="w-full !max-w-none"
-          autoComplete="new-password"
-        />
+    <>
+      <div className="flex flex-col gap-1.5 w-full">
+        <div className="flex items-center justify-between">
+          {nicknameEditing ? (
+            <input
+              type="text"
+              autoFocus
+              className="max-w-[140px] py-0.5 px-1 text-left text-sm font-sans bg-transparent border-0 border-b border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 placeholder:text-neutral-400 focus:outline-none"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              onBlur={() => setNicknameEditing(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  setNicknameEditing(false);
+                }
+              }}
+              placeholder="닉네임"
+              disabled={status === 'sending'}
+              maxLength={24}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setNicknameEditing(true)}
+              className="py-0.5 px-1 text-sm font-sans bg-transparent border-0 border-b border-transparent cursor-pointer text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
+            >
+              {nickname.trim() || '익명'}
+            </button>
+          )}
+          {onRequestClose ? (
+            <button
+              type="button"
+              onClick={onRequestClose}
+              className="p-1.5 -m-1.5 rounded-full text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+              aria-label="닫기"
+            >
+              <FiX className="w-4 h-4" />
+            </button>
+          ) : null}
+        </div>
+
+        <div className="relative rounded-md bg-white dark:bg-neutral-800">
+          <div className="flex items-center gap-0.5 px-1 pt-1">
+            {TOOLBAR_ITEMS.map(({ marker, placeholder, label, Icon }) => (
+              <button
+                key={marker}
+                type="button"
+                aria-label={label}
+                title={label}
+                disabled={status === 'sending'}
+                className="p-1 rounded text-neutral-500 dark:text-neutral-400 bg-transparent border-none cursor-pointer hover:enabled:bg-neutral-100 dark:hover:enabled:bg-neutral-700 hover:enabled:text-neutral-800 dark:hover:enabled:text-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => {
+                  const el = textareaRef.current;
+                  if (!el) return;
+                  wrapSelection(el, content, setContent, marker, placeholder);
+                }}
+              >
+                <Icon className="w-3.5 h-3.5" aria-hidden />
+              </button>
+            ))}
+          </div>
+          <textarea
+            ref={textareaRef}
+            className="w-full max-w-none py-1.5 px-2 pb-9 border-none rounded-md font-sans text-sm resize-none bg-transparent text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 focus:outline-none"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="댓글을 입력하세요."
+            rows={3}
+            disabled={status === 'sending'}
+          />
+          <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1.5">
+            {editCommentId != null && onCancelEdit ? (
+              <button
+                type="button"
+                onClick={onCancelEdit}
+                className="py-1 px-2 font-sans text-[0.8125rem] text-neutral-500 dark:text-neutral-400 bg-transparent border-none rounded-md cursor-pointer hover:text-neutral-900 dark:hover:text-neutral-100"
+                disabled={status === 'sending'}
+              >
+                수정 취소
+              </button>
+            ) : null}
+            {replyToCommentId != null && onCancelReply ? (
+              <button
+                type="button"
+                onClick={onCancelReply}
+                className="py-1 px-2 font-sans text-[0.8125rem] text-neutral-500 dark:text-neutral-400 bg-transparent border-none rounded-md cursor-pointer hover:text-neutral-900 dark:hover:text-neutral-100"
+                disabled={status === 'sending'}
+              >
+                답글 취소
+              </button>
+            ) : null}
+            <button
+              type="button"
+              disabled={status === 'sending' || !content.trim()}
+              onClick={() => {
+                if (!content.trim()) return;
+                setErrorMessage('');
+                if (editCommentId != null && editVerifiedPassword) {
+                  doSubmit(editVerifiedPassword);
+                  return;
+                }
+                setPasswordModalOpen(true);
+              }}
+              className="py-1.5 px-3 text-[0.8125rem] font-sans text-neutral-900 dark:text-neutral-100 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-md cursor-pointer transition-colors hover:enabled:bg-neutral-100 hover:enabled:dark:bg-neutral-600 hover:enabled:border-neutral-300 hover:enabled:dark:border-neutral-500 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {status === 'sending' ? '전송 중…' : editCommentId != null ? '수정하기' : replyToCommentId != null ? '답글 달기' : '댓글 달기'}
+            </button>
+          </div>
+        </div>
+
+        {status === 'done' && <span className="text-green-600 dark:text-green-400">등록되었습니다.</span>}
+        {(status === 'error' || errorMessage) && <span className="text-red-600 dark:text-red-400">{errorMessage || '전송에 실패했습니다.'}</span>}
       </div>
-      <button type="submit" disabled={status === 'sending' || !content.trim() || !password.trim()}>
-        {status === 'sending' ? '전송 중…' : editCommentId != null ? '수정하기' : replyToCommentId != null ? '답글 달기' : '댓글 달기'}
-      </button>
-      {editCommentId != null && onCancelEdit ? (
-        <button
-          type="button"
-          onClick={onCancelEdit}
-          className="py-2 px-4 font-sans text-[0.9375rem] text-neutral-500 dark:text-neutral-400 bg-transparent border-none rounded-md cursor-pointer hover:text-neutral-900 dark:hover:text-neutral-100"
-          disabled={status === 'sending'}
-        >
-          수정 취소
-        </button>
-      ) : null}
-      {replyToCommentId != null && onCancelReply ? (
-        <button
-          type="button"
-          onClick={onCancelReply}
-          className="py-2 px-4 font-sans text-[0.9375rem] text-neutral-500 dark:text-neutral-400 bg-transparent border-none rounded-md cursor-pointer hover:text-neutral-900 dark:hover:text-neutral-100"
-          disabled={status === 'sending'}
-        >
-          답글 취소
-        </button>
-      ) : null}
-      {status === 'done' && <span className="text-green-600 dark:text-green-400">등록되었습니다.</span>}
-      {(status === 'error' || errorMessage) && <span className="text-red-600 dark:text-red-400">{errorMessage || '전송에 실패했습니다.'}</span>}
-    </form>
+      {passwordModalOpen && (
+        <PasswordConfirmModal
+          title={editCommentId != null ? '댓글 수정' : '비밀번호 확인'}
+          message={editCommentId != null ? '작성 시 입력한 비밀번호를 입력하면 수정됩니다.' : undefined}
+          submitLabel={editCommentId != null ? '수정' : '등록'}
+          requireConfirm={editCommentId == null}
+          sending={status === 'sending'}
+          error={errorMessage}
+          onCancel={() => {
+            if (status === 'sending') return;
+            setPasswordModalOpen(false);
+          }}
+          onConfirm={(pw) => doSubmit(pw)}
+        />
+      )}
+    </>
   );
 }

@@ -362,7 +362,9 @@ export default function PostList() {
                   activeFilter={categoryFilter}
                   onToggle={toggleExpandedCategoryPath}
                   onSelect={(path) => {
-                    setCategoryFilter(path);
+                    const isSame =
+                      categoryFilter.length === path.length && categoryFilter.every((s, i) => path[i] === s);
+                    setCategoryFilter(isSame ? [] : path);
                     setCategoryPanelOpen(false);
                   }}
                 />
@@ -380,7 +382,7 @@ export default function PostList() {
                 <button
                   key={label}
                   type="button"
-                  onClick={() => setCategoryFilter(path)}
+                  onClick={() => setCategoryFilter(isActive ? [] : path)}
                   className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                     isActive
                       ? 'bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900'

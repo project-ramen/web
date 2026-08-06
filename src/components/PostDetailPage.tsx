@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { FiMessageCircle, FiHeart, FiX, FiArrowLeft, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { FiMessageCircle, FiHeart, FiX, FiArrowLeft, FiEdit2, FiTrash2, FiMessageSquare } from 'react-icons/fi';
+import { TbArrowsSort } from 'react-icons/tb';
 import PostRealtimeViewer, { type AnchorComment } from './PostRealtimeViewer';
 import CommentForm from './CommentForm';
+import PasswordConfirmModal from './PasswordConfirmModal';
 import PostEditor from './PostEditor';
 import { slugToNumericId } from '../lib/slugId.js';
 
 import { getApiBase } from '../lib/apiBase';
+import { renderInlineFormatting } from '../lib/renderInlineFormatting';
 
 type Post = { id: number; slug: string; title: string; body_md: string; published: number; created_at: string; category?: string[] };
 type DeletedPost = { id: number; slug: string; title: string; body_md: string; deleted: true; deleted_at: string; category?: string[] };
@@ -315,16 +318,25 @@ type CommentPopupProps = {
 function CommentPopup({ open, onClose, postId, postSlug, comments, editCommentId = null, deleteCommentId = null, onCommentSuccess }: CommentPopupProps) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [editVerifiedPassword, setEditVerifiedPassword] = useState<string | null>(null);
+  const [editVerifyTarget, setEditVerifyTarget] = useState<Comment | null>(null);
+  const [editVerifySending, setEditVerifySending] = useState(false);
+  const [editVerifyError, setEditVerifyError] = useState('');
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteSending, setDeleteSending] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [replyingId, setReplyingId] = useState<number | null>(null);
+  const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest');
   const listRef = useRef<HTMLUListElement>(null);
+  // 서버는 created_at ASC(오래된순)로 내려줌 — newest는 뒤집어서 보여줌
+  const sortedComments = sortOrder === 'newest' ? [...comments].reverse() : comments;
 
   useEffect(() => {
     if (open && editCommentId != null) {
       const c = comments.find((x) => x.id === editCommentId);
       if (c) {
-        setEditingId(c.id);
-        setEditContent(c.content);
+        setEditVerifyTarget(c);
+        setEditVerifyError('');
       }
       setDeletingId(null);
     }
@@ -345,31 +357,89 @@ function CommentPopup({ open, onClose, postId, postSlug, comments, editCommentId
   }, [open, deletingId]);
 
   const startEdit = (c: Comment) => {
-    setEditingId(c.id);
-    setEditContent(c.content);
     setReplyingId(null);
     setDeletingId(null);
+    setEditVerifyTarget(c);
+    setEditVerifyError('');
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditContent('');
+    setEditVerifiedPassword(null);
+  };
+
+  const cancelEditVerify = () => {
+    if (editVerifySending) return;
+    setEditVerifyTarget(null);
+    setEditVerifyError('');
+  };
+
+  const confirmEditVerify = async (password: string) => {
+    const apiUrl = getApiBase();
+    if (!editVerifyTarget || !apiUrl) return;
+    setEditVerifyError('');
+    setEditVerifySending(true);
+    try {
+      // 별도 "비밀번호만 확인" API가 없어서, 기존 내용 그대로 재제출해 비밀번호를 검증한다.
+      const r = await fetch(`${apiUrl}/api/comments/${editVerifyTarget.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: editVerifyTarget.content, password }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error((data && (data as { error?: string }).error) || r.statusText);
+      setEditingId(editVerifyTarget.id);
+      setEditContent(editVerifyTarget.content);
+      setEditVerifiedPassword(password);
+      setEditVerifyTarget(null);
+    } catch (err) {
+      setEditVerifyError(err instanceof Error ? err.message : '비밀번호 확인에 실패했습니다.');
+    } finally {
+      setEditVerifySending(false);
+    }
   };
 
   const startDelete = (id: number) => {
     setDeletingId(id);
     setEditingId(null);
+    setEditVerifiedPassword(null);
     setReplyingId(null);
     setEditContent('');
   };
 
   const cancelDelete = () => {
+    if (deleteSending) return;
     setDeletingId(null);
+    setDeleteError('');
+  };
+
+  const confirmDelete = async (password: string) => {
+    const apiUrl = getApiBase();
+    if (deletingId == null || !apiUrl) return;
+    setDeleteError('');
+    setDeleteSending(true);
+    try {
+      const r = await fetch(`${apiUrl}/api/comments/${deletingId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error((data && (data as { error?: string }).error) || r.statusText);
+      setDeletingId(null);
+      onCommentSuccess();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : '삭제에 실패했습니다.');
+    } finally {
+      setDeleteSending(false);
+    }
   };
 
   const startReply = (id: number) => {
     setReplyingId(id);
     setEditingId(null);
+    setEditVerifiedPassword(null);
     setEditContent('');
     setDeletingId(null);
   };
@@ -390,81 +460,17 @@ function CommentPopup({ open, onClose, postId, postSlug, comments, editCommentId
         className="fixed left-1/2 top-1/2 z-[101] -translate-x-1/2 -translate-y-1/2 w-[min(calc(100vw-2rem),420px)] max-w-[calc(100vw-1rem)] max-h-[min(80vh,85dvh)] flex flex-col rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shadow-xl"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="comment-popup-title"
+        aria-label="댓글"
       >
-        <div className="flex items-center justify-between shrink-0 px-4 py-3 border-b border-neutral-200 dark:border-neutral-700">
-          <h2 id="comment-popup-title" className="text-lg font-semibold m-0 text-neutral-900 dark:text-neutral-100">댓글 {comments.length}개</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 -m-2 rounded-full text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
-            aria-label="닫기"
-          >
-            <FiX className="w-5 h-5" />
-          </button>
-        </div>
         <div className="flex flex-col flex-1 min-h-0 p-4">
-          <ul ref={listRef} className="list-none p-0 m-0 flex-1 overflow-y-auto [&_li]:py-3">
-            {comments.map((c) => (
-              <li
-                key={c.id}
-                data-comment-id={c.id}
-                className={
-                  replyingId === c.id
-                    ? 'rounded-md px-2 py-2 bg-blue-50/50 dark:bg-blue-950/20'
-                    : editingId === c.id
-                    ? 'rounded-md px-2 py-2 bg-amber-50/60 dark:bg-amber-950/20'
-                    : deletingId === c.id
-                    ? 'rounded-md px-2 py-2 bg-rose-50/70 dark:bg-rose-950/25'
-                    : undefined
-                }
-              >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="mb-1 text-xs text-neutral-500 dark:text-neutral-400">
-                          <span className="font-medium text-neutral-600 dark:text-neutral-300">{c.user_id?.trim() ? c.user_id : '익명'}</span>
-                          {c.created_at ? <span className="ml-1">{c.created_at}</span> : null}
-                        </div>
-                        <p className="m-0 text-neutral-900 dark:text-neutral-100">{c.content}</p>
-                      </div>
-                      <div className="shrink-0 flex items-center gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => startReply(c.id)}
-                          className="px-1.5 py-1 rounded text-[0.75rem] text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
-                          aria-label="댓글에 답글 달기"
-                        >
-                          답글
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => startEdit(c)}
-                          className="p-1.5 rounded text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
-                          aria-label="댓글 수정"
-                        >
-                          <FiEdit2 className="w-4 h-4" aria-hidden />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => startDelete(c.id)}
-                          className="p-1.5 rounded text-neutral-500 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                          aria-label="댓글 삭제"
-                        >
-                          <FiTrash2 className="w-4 h-4" aria-hidden />
-                        </button>
-                      </div>
-                    </div>
-              </li>
-            ))}
-          </ul>
-          <div className="shrink-0 pt-4 mt-4 border-t border-neutral-200 dark:border-neutral-700">
+          <div className="shrink-0 pb-4 border-b border-neutral-200 dark:border-neutral-700">
             {replyingId != null ? (
-              <div className="mb-2 inline-flex items-center gap-2 max-w-full rounded-full border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-3 py-1 text-xs text-blue-700 dark:text-blue-300">
+              <div className="mb-2 inline-flex items-center gap-2 max-w-full rounded-full border border-neutral-200 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-1 text-xs text-neutral-700 dark:text-neutral-300">
                 <span className="truncate">답글 작성 중 · 댓글 #{replyingId}</span>
                 <button
                   type="button"
                   onClick={cancelReply}
-                  className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                  className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                   aria-label="답글 작성 취소"
                 >
                   <FiX className="w-3.5 h-3.5" aria-hidden />
@@ -472,26 +478,13 @@ function CommentPopup({ open, onClose, postId, postSlug, comments, editCommentId
               </div>
             ) : null}
             {editingId != null ? (
-              <div className="mb-2 inline-flex items-center gap-2 max-w-full rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-1 text-xs text-amber-700 dark:text-amber-300">
+              <div className="mb-2 inline-flex items-center gap-2 max-w-full rounded-full border border-neutral-200 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-1 text-xs text-neutral-700 dark:text-neutral-300">
                 <span className="truncate">댓글 수정 중 · 댓글 #{editingId}</span>
                 <button
                   type="button"
                   onClick={cancelEdit}
-                  className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                  className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                   aria-label="댓글 수정 취소"
-                >
-                  <FiX className="w-3.5 h-3.5" aria-hidden />
-                </button>
-              </div>
-            ) : null}
-            {deletingId != null ? (
-              <div className="mb-2 inline-flex items-center gap-2 max-w-full rounded-full border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-3 py-1 text-xs text-rose-700 dark:text-rose-300">
-                <span className="truncate">댓글 삭제 중 · 댓글 #{deletingId}</span>
-                <button
-                  type="button"
-                  onClick={cancelDelete}
-                  className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50"
-                  aria-label="댓글 삭제 취소"
                 >
                   <FiX className="w-3.5 h-3.5" aria-hidden />
                 </button>
@@ -504,20 +497,136 @@ function CommentPopup({ open, onClose, postId, postSlug, comments, editCommentId
               onCancelReply={replyingId != null ? cancelReply : undefined}
               editCommentId={editingId}
               initialContent={editContent}
+              editVerifiedPassword={editVerifiedPassword ?? undefined}
               onCancelEdit={editingId != null ? cancelEdit : undefined}
-              deleteCommentId={deletingId}
-              onCancelDelete={deletingId != null ? cancelDelete : undefined}
+              onRequestClose={onClose}
               onSuccess={() => {
                 setReplyingId(null);
                 setEditingId(null);
+                setEditVerifiedPassword(null);
                 setEditContent('');
                 setDeletingId(null);
                 onCommentSuccess();
               }}
             />
           </div>
+          <div className="shrink-0 pt-4 pb-1 flex items-center justify-between gap-1.5">
+            <p className="m-0 flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400">
+              <span>댓글</span>
+              <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-neutral-200 dark:bg-neutral-700 text-xs font-medium tabular-nums text-neutral-700 dark:text-neutral-200">
+                {comments.length}
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={() => setSortOrder((o) => (o === 'oldest' ? 'newest' : 'oldest'))}
+              className="inline-flex items-center gap-1 py-1 px-2 text-xs font-sans rounded text-neutral-500 dark:text-neutral-400 bg-transparent border-none cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-800 dark:hover:text-neutral-200"
+            >
+              <TbArrowsSort className="w-3.5 h-3.5" aria-hidden />
+              {sortOrder === 'oldest' ? '오래된순' : '최신순'}
+            </button>
+          </div>
+          {sortedComments.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center py-8 text-sm text-neutral-400 dark:text-neutral-500">
+              댓글이 존재하지 않습니다
+            </div>
+          ) : (
+          <ul ref={listRef} className="list-none p-0 m-0 flex-1 overflow-y-auto [&_li]:py-3">
+            {sortedComments.map((c, index) => (
+              <li
+                key={c.id}
+                data-comment-id={c.id}
+                className="relative"
+              >
+                    <div className="absolute inset-y-0 left-0 w-4 flex justify-center" aria-hidden>
+                      {index > 0 && (
+                        <span
+                          className="absolute left-1/2 -translate-x-1/2 top-0 w-px bg-[#879e82] dark:bg-[#586954]"
+                          style={{ height: '13px' }}
+                        />
+                      )}
+                      {index < sortedComments.length - 1 && (
+                        <span
+                          className="absolute left-1/2 -translate-x-1/2 bottom-0 w-px bg-[#879e82] dark:bg-[#586954]"
+                          style={{ top: '27px' }}
+                        />
+                      )}
+                      <span className="absolute left-1/2 top-[20px] -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[#879e82] dark:bg-[#586954]" />
+                    </div>
+                    <div
+                      className={
+                        'pl-4' +
+                        (replyingId === c.id || editingId === c.id
+                          ? ' rounded-md pr-2 py-2 border border-neutral-900 dark:border-white'
+                          : '')
+                      }
+                    >
+                      <div className="mb-1 text-xs text-neutral-500 dark:text-neutral-400">
+                        <span className="font-medium text-neutral-600 dark:text-neutral-300">{c.user_id?.trim() ? c.user_id : '익명'}</span>
+                        {c.created_at ? <span className="ml-1">{c.created_at}</span> : null}
+                      </div>
+                      <p className="m-0 text-neutral-900 dark:text-neutral-100">{renderInlineFormatting(c.content)}</p>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => startReply(c.id)}
+                          className="inline-flex items-center gap-1 px-1.5 py-1 rounded text-[0.75rem] text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+                          aria-label="댓글에 답글 달기"
+                        >
+                          <FiMessageSquare className="w-4 h-4" aria-hidden />
+                          답글
+                        </button>
+                        <div className="shrink-0 flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(c)}
+                            className="p-1.5 rounded text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+                            aria-label="댓글 수정"
+                          >
+                            <FiEdit2 className="w-4 h-4" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => startDelete(c.id)}
+                            className="p-1.5 rounded text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                            aria-label="댓글 삭제"
+                          >
+                            <FiTrash2 className="w-4 h-4" aria-hidden />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+              </li>
+            ))}
+          </ul>
+          )}
         </div>
       </div>
+      {deletingId != null && (
+        <PasswordConfirmModal
+          title="댓글 삭제"
+          message="삭제하면 되돌릴 수 없습니다. 작성 시 입력한 비밀번호를 입력해주세요."
+          submitLabel="삭제"
+          requireConfirm={false}
+          danger
+          sending={deleteSending}
+          error={deleteError}
+          onCancel={cancelDelete}
+          onConfirm={(pw) => void confirmDelete(pw)}
+        />
+      )}
+      {editVerifyTarget != null && (
+        <PasswordConfirmModal
+          title="댓글 수정"
+          message="비밀번호를 입력하면 수정할 수 있습니다."
+          submitLabel="확인"
+          requireConfirm={false}
+          sending={editVerifySending}
+          error={editVerifyError}
+          onCancel={cancelEditVerify}
+          onConfirm={(pw) => void confirmEditVerify(pw)}
+        />
+      )}
     </>,
     document.body
   );

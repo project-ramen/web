@@ -86,11 +86,18 @@ const remarkCallouts: Plugin<[], Root> = () => (tree) => {
 		}
 		bodyChildren.push(...(node.children.slice(1) as CalloutChild[]));
 
+		// 아이콘은 텍스트 없는 빈 span(CSS background-image로 그림)이라 raw↔렌더 매핑에 영향 없음
+		const iconNode: PhrasingContent = {
+			type: 'text',
+			value: '',
+			data: { hName: 'span', hProperties: { className: ['callout-icon'] } },
+		};
 		const titleChildren: PhrasingContent[] = customTitle?.trim()
-			? [{ type: 'text', value: customTitle.trim() }]
-			: [];
+			? [iconNode, { type: 'text', value: customTitle.trim() }]
+			: [iconNode];
 
 		const isFoldable = fold === '+' || fold === '-';
+		const hasCustomTitle = !!customTitle?.trim();
 		const titleNode: Paragraph = {
 			type: 'paragraph',
 			children: titleChildren,
@@ -98,7 +105,7 @@ const remarkCallouts: Plugin<[], Root> = () => (tree) => {
 				hName: isFoldable ? 'summary' : 'div',
 				hProperties: {
 					className: ['callout-title'],
-					...(titleChildren.length === 0 ? { 'data-callout-label': label } : {}),
+					...(hasCustomTitle ? {} : { 'data-callout-label': label }),
 				},
 			},
 		};
