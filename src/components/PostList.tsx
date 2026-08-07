@@ -172,6 +172,23 @@ function CategoryTreeList({
   );
 }
 
+function PostListSkeleton() {
+  const bar = 'rounded-md bg-neutral-200 dark:bg-neutral-700';
+  return (
+    <ul className="list-none p-0 [&_li]:py-2 animate-pulse" aria-hidden="true">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <li key={i} className="flex items-center justify-between gap-3">
+          <span className="flex-1 min-w-0 flex flex-col gap-1.5">
+            <span className={`h-4 ${i % 2 === 0 ? 'w-2/3' : 'w-1/2'} ${bar}`} />
+            <span className={`h-3 w-24 ${bar}`} />
+          </span>
+          <span className={`h-4 w-6 shrink-0 ${bar}`} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function PostList() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -279,7 +296,7 @@ export default function PostList() {
     return (
       <>
         <div className="mb-4">{newPostButton}</div>
-        <p className="text-neutral-600 dark:text-neutral-400">로딩 중…</p>
+        <PostListSkeleton />
       </>
     );
   if (error)

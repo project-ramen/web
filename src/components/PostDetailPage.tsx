@@ -64,6 +64,28 @@ function setStoredLike(postId: number, liked: boolean) {
   } catch {}
 }
 
+function PostDetailSkeleton() {
+  const bar = 'rounded-md bg-neutral-200 dark:bg-neutral-700';
+  return (
+    <div className="animate-pulse" aria-hidden="true">
+      <header className="mb-6 sm:mb-8">
+        <div className={`h-4 w-24 mb-2 ${bar}`} />
+        <div className={`h-9 w-3/4 mb-2 ${bar}`} />
+        <div className={`h-4 w-32 ${bar}`} />
+      </header>
+      <div className="flex flex-col gap-3">
+        <div className={`h-4 w-full ${bar}`} />
+        <div className={`h-4 w-full ${bar}`} />
+        <div className={`h-4 w-5/6 ${bar}`} />
+        <div className={`h-4 w-full ${bar}`} />
+        <div className={`h-4 w-2/3 ${bar}`} />
+        <div className={`h-4 w-full ${bar}`} />
+        <div className={`h-4 w-4/5 ${bar}`} />
+      </div>
+    </div>
+  );
+}
+
 export default function PostDetailPage({ slug }: Props) {
   const [headings, setHeadings] = useState<{ id: string; text: string; level: number }[]>([]);
   const [mobileTocOpen, setMobileTocOpen] = useState(false);
@@ -162,7 +184,7 @@ export default function PostDetailPage({ slug }: Props) {
     </a>
   );
   const pageWrapClass = 'min-w-0 w-full';
-  if (loading) return <div className={pageWrapClass}>{backLink}<p className="m-0">로딩 중…</p></div>;
+  if (loading) return <div className={pageWrapClass}>{backLink}<PostDetailSkeleton /></div>;
   if (!post) return <div className={pageWrapClass}>{backLink}<p className="m-0">포스트를 찾을 수 없습니다.</p></div>;
 
   if ('deleted' in post) {
