@@ -12,8 +12,8 @@ export default {
   languages: ['C', 'Python', 'JavaScript', 'TypeScript'],
   frameworks: ['React', 'Tauri'],
   links: [
-    { label: 'GitHub', href: 'https://github.com', ariaLabel: 'GitHub 열기' },
-    { label: '이메일', href: 'mailto:hello@example.com', ariaLabel: '이메일 보내기' },
+    { label: 'GitHub', href: 'https://github.com/dennis0324', ariaLabel: 'GitHub 열기' },
+    { label: '이메일', href: 'mailto:dennis0324@naver.com', ariaLabel: '이메일 보내기' },
   ],
   timeline: [
     { period: '2019', label: '학교 입학' },

@@ -30,6 +30,30 @@ function parseJsonArray(value: unknown): string[] {
 
 type Props = { slug: string };
 
+function ProjectDetailSkeleton() {
+  const bar = 'rounded-md bg-neutral-200 dark:bg-neutral-700';
+  return (
+    <div className="animate-pulse" aria-hidden="true">
+      <div className="project-detail-banner-wrap" />
+      <div className="project-detail-header">
+        <div className="project-detail-head-row">
+          <div className={`w-16 h-16 rounded-2xl shrink-0 ${bar}`} />
+          <div className="flex flex-col gap-2 flex-1 min-w-0">
+            <div className={`h-6 w-1/2 ${bar}`} />
+            <div className={`h-4 w-1/3 ${bar}`} />
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <div className={`h-4 w-full ${bar}`} />
+        <div className={`h-4 w-full ${bar}`} />
+        <div className={`h-4 w-5/6 ${bar}`} />
+        <div className={`h-4 w-2/3 ${bar}`} />
+      </div>
+    </div>
+  );
+}
+
 export default function PostProjectDetail({ slug }: Props) {
   const [loading, setLoading] = useState(true);
   const [post, setPost] = useState<ProjectPost | null>(null);
@@ -82,7 +106,7 @@ export default function PostProjectDetail({ slug }: Props) {
     return (
       <div className="project-detail">
         <a href="/projects" className="project-detail-back">← 프로젝트 목록</a>
-        <p className="m-0 text-neutral-500 dark:text-neutral-400">로딩 중…</p>
+        <ProjectDetailSkeleton />
       </div>
     );
   }
