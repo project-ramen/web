@@ -2,67 +2,120 @@
 import Layout from '../../layouts/Layout.astro';
 import type { AboutProfile } from './about/types';
 import profile from './about/profile';
+import { SiC, SiCplusplus, SiPython, SiJavascript, SiTypescript } from 'react-icons/si';
+import { FiGithub, FiMail } from 'react-icons/fi';
+import type { IconType } from 'react-icons';
 
 const data: AboutProfile = profile;
+
+const LANGUAGE_ICONS: Record<string, { Icon: IconType; color: string }> = {
+  C: { Icon: SiC, color: '#A8B9CC' },
+  'C++': { Icon: SiCplusplus, color: '#00599C' },
+  Python: { Icon: SiPython, color: '#3776AB' },
+  JavaScript: { Icon: SiJavascript, color: '#F7DF1E' },
+  TypeScript: { Icon: SiTypescript, color: '#3178C6' },
+};
+
+const LINK_ICONS: Record<string, IconType> = {
+  GitHub: FiGithub,
+  이메일: FiMail,
+};
 ---
 <Layout title="ABOUT | Ramen Blog">
   <div class="about-page">
     <header class="about-header">
       <h1 class="font-display text-[clamp(2rem,5vw,3rem)] m-0 mb-2 text-neutral-900 dark:text-neutral-100">About</h1>
-      <p class="text-neutral-500 dark:text-neutral-400 text-base m-0">소개</p>
+      <!-- <p class="text-neutral-500 dark:text-neutral-400 text-base m-0">소개</p> -->
     </header>
 
-    <article class="about-card">
-      <div class="about-card-inner">
+    <section class="intro-section" aria-label="소개">
+      <h2 class="work-exp-title">소개</h2>
+      <div class="about-intro">
         {data.avatar && (
           <div class="about-avatar-wrap">
             <img class="about-avatar" src={data.avatar} alt="" width="120" height="120" />
           </div>
         )}
-        <div class="about-card-body">
-          <h2 class="about-name">{data.name}</h2>
-          <p class="about-tagline">{data.tagline}</p>
-          <div class="about-bio">
-            {data.bio.map((paragraph) => (
-              <p class="about-bio-p">{paragraph}</p>
-            ))}
-          </div>
-          <div class="about-meta">
-            <p class="about-meta-row">
-              <span class="about-meta-label">사용 언어</span>
-              <span class="about-meta-value">{data.languages.join(', ')}</span>
-            </p>
-            <p class="about-meta-row">
-              <span class="about-meta-label">프레임워크</span>
-              <span class="about-meta-value">{data.frameworks.join(', ')}</span>
-            </p>
-          </div>
+        <div class="about-intro-body">
+          <h3 class="about-name">{data.name}</h3>
           <div class="about-links">
-            {data.links.map((link) => (
-              <a
-                href={link.href}
-                class="about-link"
-                target={link.href.startsWith('http') ? '_blank' : undefined}
-                rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                aria-label={link.ariaLabel ?? link.label}
-              >
-                {link.label} →
-              </a>
-            ))}
+            {data.links.map((link) => {
+              const Icon = LINK_ICONS[link.label];
+              return (
+                <a
+                  href={link.href}
+                  class="about-link"
+                  target={link.href.startsWith('http') ? '_blank' : undefined}
+                  rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                  aria-label={link.ariaLabel ?? link.label}
+                  title={link.label}
+                >
+                  {Icon ? <Icon aria-hidden="true" /> : link.label}
+                </a>
+              );
+            })}
           </div>
         </div>
       </div>
-    </article>
+    </section>
 
-    <section class="about-timeline-section" aria-label="연혁">
-      <h2 class="about-timeline-title">연혁</h2>
-      <ul class="about-timeline-list">
-        {data.timeline.map((item) => (
-          <li class="about-timeline-item">
-            <span class="about-timeline-period">{item.period}</span>
-            <span class="about-timeline-label">{item.label}</span>
-          </li>
-        ))}
+    <section class="skills-section" aria-label="사용 언어">
+      <h2 class="work-exp-title">사용 언어</h2>
+      <ul class="skills-grid">
+        {data.languages.map((lang) => {
+          const meta = LANGUAGE_ICONS[lang];
+          return (
+            <li class="skill-item">
+              <span class="skill-icon" style={meta ? { '--skill-color': meta.color } : undefined}>
+                {meta ? <meta.Icon aria-hidden="true" /> : lang.slice(0, 2).toUpperCase()}
+              </span>
+              <span class="skill-label">{lang}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+
+    <section class="work-exp-section" aria-label="경력">
+      <h2 class="work-exp-title">경력</h2>
+      <ul class="work-exp-list">
+        {data.workExperience.map((company) => {
+          const isCurrentCompany = company.roles.some((r) => r.current);
+          return (
+            <li class="work-exp-company">
+              <div class="work-exp-company-head">
+                <span class={`work-exp-logo ${isCurrentCompany ? 'is-current' : ''}`} aria-hidden="true">
+                  {company.logo ? <img src={company.logo} alt="" /> : company.initial}
+                </span>
+                <span class="work-exp-company-name">{company.name}</span>
+              </div>
+              <ul class={`work-exp-roles ${company.roles.length > 1 ? 'has-trunk' : ''}`}>
+                {company.roles.map((role) => (
+                  <li class={`work-exp-role ${role.current ? 'is-current' : ''}`}>
+                    <p class="work-exp-role-title">
+                      {role.title}
+                      {role.current && <span class="work-exp-current-badge">현재</span>}
+                    </p>
+                    <p class="work-exp-role-meta">
+                      {role.period} <span class="work-exp-duration">({role.duration})</span>
+                      <span class="work-exp-dot" aria-hidden="true">•</span>
+                      {role.location}
+                      <span class="work-exp-dot" aria-hidden="true">•</span>
+                      {role.employmentType}
+                    </p>
+                    {role.bullets && role.bullets.length > 0 && (
+                      <ul class="work-exp-bullets">
+                        {role.bullets.map((bullet) => (
+                          <li>{bullet}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </li>
+          );
+        })}
       </ul>
     </section>
   </div>
@@ -71,84 +124,244 @@ const data: AboutProfile = profile;
 <style>
   .about-page {
     padding-bottom: 2rem;
-    --about-timeline-line: #e5e5e5;
+    --about-title: #171717;
+    --about-text: #404040;
+    --about-muted: #737373;
+    --about-cta: #2563eb;
+    --about-avatar-bg: #f5f5f5;
+    --about-link-bg: #eff6ff;
+    --about-link-bg-hover: #dbeafe;
   }
   :global(.dark) .about-page {
-    --about-timeline-line: #404040;
+    --about-title: #fafafa;
+    --about-text: #d4d4d4;
+    --about-muted: #a3a3a3;
+    --about-cta: #93c5fd;
+    --about-avatar-bg: #404040;
+    --about-link-bg: #1e3a5f;
+    --about-link-bg-hover: #1e40af;
   }
   .about-header {
     margin-bottom: 2rem;
   }
-  .about-timeline-section {
-    margin-top: 2.5rem;
-  }
-  .about-timeline-title {
+  .work-exp-title {
     font-family: var(--font-family-display);
     font-size: 1.25rem;
     font-weight: 700;
     margin: 0 0 1.25rem;
     color: var(--about-title);
   }
-  .about-timeline-list {
+
+  /* 사용 언어 */
+  .skills-section {
+    margin-top: 2.5rem;
+  }
+  .skills-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+    gap: 1rem;
+  }
+  .skill-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .skill-icon {
+    --skill-color: var(--about-muted);
+    width: 3rem;
+    height: 3rem;
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--skill-color);
+    background: color-mix(in srgb, var(--skill-color) 14%, transparent);
+  }
+  :global(.dark) .skill-icon {
+    background: color-mix(in srgb, var(--skill-color) 22%, transparent);
+  }
+  .skill-icon :global(svg) {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+  .skill-label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--about-muted);
+  }
+
+  /* 경력 트리 */
+  .work-exp-section {
+    margin-top: 2.5rem;
+    --work-exp-line: #e5e7eb;
+    --work-exp-line-current: #22c55e;
+    --work-exp-logo-bg: #d4d4d4;
+    --work-exp-logo-fg: #525252;
+    --work-exp-logo-bg-current: #22c55e;
+    --work-exp-logo-fg-current: #ffffff;
+    --work-exp-title: var(--about-title);
+    --work-exp-title-current: #16a34a;
+    --work-exp-muted: var(--about-muted);
+  }
+  :global(.dark) .work-exp-section {
+    --work-exp-line: #404040;
+    --work-exp-line-current: #4ade80;
+    --work-exp-logo-bg: #404040;
+    --work-exp-logo-fg: #d4d4d4;
+    --work-exp-logo-bg-current: #16a34a;
+    --work-exp-logo-fg-current: #f0fdf4;
+    --work-exp-title-current: #4ade80;
+  }
+  .work-exp-list {
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0;
-    border-left: 2px solid var(--about-timeline-line);
-    padding-left: 1.25rem;
-    margin-left: 0.25rem;
+    gap: 2rem;
   }
-  .about-timeline-item {
+  .work-exp-company {
     position: relative;
-    padding-bottom: 1rem;
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 1rem;
-    align-items: baseline;
   }
-  .about-timeline-item::before {
+  .work-exp-company-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .work-exp-logo {
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: var(--work-exp-logo-bg);
+    color: var(--work-exp-logo-fg);
+    overflow: hidden;
+  }
+  .work-exp-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .work-exp-logo.is-current {
+    background: var(--work-exp-logo-bg-current);
+    color: var(--work-exp-logo-fg-current);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--work-exp-line-current) 25%, transparent);
+  }
+  .work-exp-company-name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--work-exp-title);
+  }
+  .work-exp-roles {
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0 0 0 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    position: relative;
+  }
+  .work-exp-roles.has-trunk {
+    /* role이 2개 이상일 때만 로고 중심(왼쪽 1.125rem)에서 아래로 이어지는 줄기를 그림 */
+    position: relative;
+  }
+  .work-exp-roles.has-trunk::before {
     content: '';
     position: absolute;
-    left: -1.45rem;
-    top: 0.4em;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--about-cta);
+    left: 1.125rem;
+    top: -0.5rem;
+    bottom: 0.6rem;
+    width: 2px;
+    background: var(--work-exp-line);
   }
-  .about-timeline-period {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--about-muted);
-    min-width: 6.5rem;
+  .work-exp-company:has(.work-exp-role.is-current) .work-exp-roles.has-trunk::before {
+    background: var(--work-exp-line-current);
   }
-  .about-timeline-label {
+  .work-exp-role {
+    position: relative;
+    padding-left: 0.4rem;
+  }
+  .work-exp-role::before {
+    /* 로고 중심(-0.625rem)에서 콘텐츠 왼쪽 끝(0)까지만 이어지는 L자 곡선 — 제목 텍스트와 겹치지 않도록 콘텐츠 경계에서 멈춤 */
+    content: '';
+    position: absolute;
+    left: -0.625rem;
+    top: -0.5rem;
+    width: 0.625rem;
+    height: 1.1rem;
+    border-left: 2px solid var(--work-exp-line);
+    border-bottom: 2px solid var(--work-exp-line);
+    border-bottom-left-radius: 0.5rem;
+  }
+  .work-exp-role.is-current::before {
+    border-color: var(--work-exp-line-current);
+  }
+  .work-exp-role-title {
+    margin: 0;
     font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--work-exp-title);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .work-exp-role.is-current .work-exp-role-title {
+    color: var(--work-exp-title-current);
+  }
+  .work-exp-current-badge {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--work-exp-logo-fg-current);
+    background: var(--work-exp-line-current);
+    padding: 0.0625rem 0.5rem;
+    border-radius: 999px;
+  }
+  .work-exp-role-meta {
+    margin: 0.25rem 0 0;
+    font-size: 0.8125rem;
+    color: var(--work-exp-muted);
+  }
+  .work-exp-duration {
+    color: var(--work-exp-muted);
+  }
+  .work-exp-dot {
+    margin: 0 0.375rem;
+  }
+  .work-exp-bullets {
+    margin: 0.5rem 0 0;
+    padding-left: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+  .work-exp-bullets li {
+    font-size: 0.875rem;
+    line-height: 1.55;
     color: var(--about-text);
   }
-  .about-card {
-    background: var(--about-card-bg);
-    border-radius: 1rem;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  }
-  :global(.dark) .about-card {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  }
-  .about-card-inner {
-    padding: 1.75rem 1.5rem;
+  .about-intro {
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
   }
   @media (min-width: 480px) {
-    .about-card-inner {
+    .about-intro {
       flex-direction: row;
-      align-items: flex-start;
+      align-items: center;
       gap: 1.5rem;
-      padding: 2rem 1.75rem;
     }
   }
   .about-avatar-wrap {
@@ -168,92 +381,35 @@ const data: AboutProfile = profile;
       height: 7rem;
     }
   }
-  .about-card-body {
+  .about-intro-body {
     min-width: 0;
   }
   .about-name {
-    font-family: var(--font-family-display);
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0 0 0.25rem;
-    color: var(--about-title);
-  }
-  .about-tagline {
-    font-size: 0.9375rem;
-    font-weight: 500;
-    color: var(--about-muted);
-    margin: 0 0 1rem;
-  }
-  .about-bio {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  .about-bio-p {
-    font-size: 0.9375rem;
-    line-height: 1.65;
-    margin: 0;
-    color: var(--about-text);
-  }
-  .about-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  .about-meta-row {
-    margin: 0;
-    font-size: 0.875rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: baseline;
-  }
-  .about-meta-label {
-    font-weight: 600;
-    color: var(--about-muted);
-    flex-shrink: 0;
-  }
-  .about-meta-value {
+    font-family: var(--font-family-sans);
+    font-size: 1rem;
+    font-weight: 400;
+    margin: 0 0 0.75rem;
     color: var(--about-text);
   }
   .about-links {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
-    margin-top: 0.5rem;
   }
   .about-link {
-    font-size: 0.875rem;
-    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 1.0625rem;
     color: var(--about-cta);
     text-decoration: none;
-    padding: 0.375rem 0.75rem;
-    border-radius: 0.5rem;
+    border-radius: 50%;
     background: var(--about-link-bg);
     transition: background 0.2s ease, color 0.2s ease;
   }
   .about-link:hover {
-    text-decoration: underline;
     background: var(--about-link-bg-hover);
-  }
-  .about-card {
-    --about-card-bg: #ffffff;
-    --about-title: #171717;
-    --about-text: #404040;
-    --about-muted: #737373;
-    --about-cta: #2563eb;
-    --about-avatar-bg: #f5f5f5;
-    --about-link-bg: #eff6ff;
-    --about-link-bg-hover: #dbeafe;
-  }
-  :global(.dark) .about-card {
-    --about-card-bg: #262626;
-    --about-title: #fafafa;
-    --about-text: #d4d4d4;
-    --about-muted: #a3a3a3;
-    --about-cta: #93c5fd;
-    --about-avatar-bg: #404040;
-    --about-link-bg: #1e3a5f;
-    --about-link-bg-hover: #1e40af;
   }
 </style>
