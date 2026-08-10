@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ProjectBody from './ProjectBody';
 import { getApiBase } from '../lib/apiBase';
 
@@ -11,6 +11,8 @@ type ProjectPost = {
   category: string[];
   banner?: string | null;
   banner_url?: string | null;
+  /** true면 body_md를 마크다운 대신 raw HTML로 그대로 표시 */
+  html_mode?: boolean;
   deleted?: boolean;
   deleted_at?: string | null;
 };
@@ -57,6 +59,23 @@ function ProjectDetailSkeleton() {
 export default function PostProjectDetail({ slug }: Props) {
   const [loading, setLoading] = useState(true);
   const [post, setPost] = useState<ProjectPost | null>(null);
+  const htmlFrameRef = useRef<HTMLIFrameElement>(null);
+
+  // html_mode iframe이 스크롤바 없이 실제 콘텐츠 높이만큼 늘어나도록 로드 후 측정해서 반영
+  const resizeHtmlFrame = () => {
+    const frame = htmlFrameRef.current;
+    const doc = frame?.contentDocument;
+    if (!frame || !doc) return;
+    const height = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight ?? 0);
+    if (height > 0) frame.style.height = `${height}px`;
+  };
+
+  // 뷰포트 리사이즈로 iframe 내부 레이아웃이 바뀔 때도 높이 재측정
+  useEffect(() => {
+    if (!post?.html_mode) return;
+    window.addEventListener('resize', resizeHtmlFrame);
+    return () => window.removeEventListener('resize', resizeHtmlFrame);
+  }, [post?.html_mode]);
 
   useEffect(() => {
     if (!getApiBase() || !slug) {
@@ -89,6 +108,7 @@ export default function PostProjectDetail({ slug }: Props) {
           category: parseJsonArray(rawPost.category),
           banner: typeof rawPost.banner === 'string' && rawPost.banner ? rawPost.banner : null,
           banner_url: typeof rawPost.banner_url === 'string' && rawPost.banner_url ? rawPost.banner_url : null,
+          html_mode: Number(rawPost.html_mode ?? 0) === 1,
         });
       })
       .catch(() => {
@@ -141,7 +161,18 @@ export default function PostProjectDetail({ slug }: Props) {
         </div>
       )}
       <div className="project-detail-content">
-        <ProjectBody content={post.body_md} />
+        {post.html_mode ? (
+          <iframe
+            ref={htmlFrameRef}
+            className="project-detail-html-frame"
+            srcDoc={post.body_md}
+            title={post.title}
+            sandbox="allow-scripts allow-popups allow-forms allow-same-origin"
+            onLoad={resizeHtmlFrame}
+          />
+        ) : (
+          <ProjectBody content={post.body_md} />
+        )}
       </div>
     </div>
   );

@@ -691,6 +691,18 @@ html.dark {
 .project-detail-content {
   margin: 1.5rem 0;
 }
+.project-detail-html-frame {
+  display: block;
+  width: 100%;
+  /* 로드 후 JS가 실제 콘텐츠 높이로 갱신 — 그 전까지 보여줄 초기값일 뿐, 상한 없음 */
+  height: 480px;
+  border: 1px solid #e5e5e5;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+.dark .project-detail-html-frame {
+  border-color: #404040;
+}
 /* .project-body-markdown uses global .markdown-content (same as app preview) */
 .project-detail-content .project-body-markdown {
   color: var(--color-muted);
