@@ -66,8 +66,12 @@ export default function PostProjectDetail({ slug }: Props) {
     const frame = htmlFrameRef.current;
     const doc = frame?.contentDocument;
     if (!frame || !doc) return;
+    // 내부 문서 자체는 스크롤되지 않도록 고정 — iframe 높이를 콘텐츠에 맞추는 방식이라 스크롤이 필요 없음
+    if (doc.documentElement) doc.documentElement.style.overflow = 'hidden';
+    if (doc.body) doc.body.style.overflow = 'hidden';
     const height = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight ?? 0);
-    if (height > 0) frame.style.height = `${height}px`;
+    // 라운딩/서브픽셀 오차로 인한 잔여 스크롤 방지용 여유값
+    if (height > 0) frame.style.height = `${height + 2}px`;
   };
 
   // 뷰포트 리사이즈로 iframe 내부 레이아웃이 바뀔 때도 높이 재측정
@@ -84,7 +88,7 @@ export default function PostProjectDetail({ slug }: Props) {
     }
     let cancelled = false;
     Promise.all([
-      fetch(`${getApiBase()}/api/posts/by-slug/${encodeURIComponent(slug)}`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`${getApiBase()}/api/posts/by-slug/${encodeURIComponent(slug)}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),
       fetch(`${getApiBase()}/api/settings/project-tag`).then((r) => (r.ok ? r.json() : { value: '' })),
     ])
       .then(([rawPost, tagSetting]: [Record<string, unknown> | null, { value?: string }]) => {
@@ -168,6 +172,7 @@ export default function PostProjectDetail({ slug }: Props) {
             srcDoc={post.body_md}
             title={post.title}
             sandbox="allow-scripts allow-popups allow-forms allow-same-origin"
+            scrolling="no"
             onLoad={resizeHtmlFrame}
           />
         ) : (

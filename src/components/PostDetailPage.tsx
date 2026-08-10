@@ -122,7 +122,7 @@ export default function PostDetailPage({ slug }: Props) {
       setLoading(false);
       return;
     }
-    fetch(`${getApiBase()}/api/posts/by-slug/${encodeURIComponent(slug)}`)
+    fetch(`${getApiBase()}/api/posts/by-slug/${encodeURIComponent(slug)}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((p: Post | DeletedPost | null) => {
         if (cancelled) return;
