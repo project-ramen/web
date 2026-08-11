@@ -1,12 +1,19 @@
 @import "tailwindcss";
 /* Code block syntax highlighting (light) */
 @import "highlight.js/styles/github.min.css";
+/* LaTeX 수식 렌더링(KaTeX) — 폰트(KaTeX_*.woff2)까지 포함된 스타일시트 */
+@import "katex/dist/katex.min.css";
 /* Dark: override with github-dark when .dark is on html */
 .dark .markdown-content pre .hljs,
 .dark .markdown-content .hljs {
   color: #c9d1d9;
-  /* github.min.css(라이트 테마)가 .hljs에 background:#fff를 직접 박아놔서,
-     다크모드에서 글자색만 바꾸면 흰 배경에 밝은 글자로 거의 안 보이게 됨 */
+}
+/* github.min.css(라이트 테마)가 .hljs에 background:#fff를 직접 박아놔서, 다크모드에서 글자색만
+   바꾸면 흰 배경에 밝은 글자로 거의 안 보이게 됨 — pre 안(블록 코드)은 그 흰 배경을 지우고 대신
+   pre 자체의 어두운 배경(#484747)을 그대로 보이게 함. 인라인 코드(.hljs만, pre 없음)는 여기서
+   지우면 안 됨 — `.markdown-content code`가 준 인라인 전용 배경(#484747)까지 같이 지워지기 때문
+   (이 선택자가 특이도가 더 높아서 이겨버림). */
+.dark .markdown-content pre .hljs {
   background: transparent;
 }
 .dark .markdown-content pre .hljs .hljs-keyword,
@@ -187,6 +194,12 @@ html.dark {
 .markdown-content code {
   font-family: ui-monospace, monospace;
   font-size: 0.9em;
+  background: #f4f4f4;
+  padding: 0.15em 0.4em;
+  border-radius: 0.25rem;
+}
+.dark .markdown-content code {
+  background: #484747;
 }
 .markdown-content pre code {
   padding: 0;
