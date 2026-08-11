@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import rehypeSlug from 'rehype-slug';
 import type { Components } from 'react-markdown';
@@ -13,7 +14,6 @@ import PasswordConfirmModal from './PasswordConfirmModal';
 import { getApiBase } from '../lib/apiBase';
 import remarkWikilinks from '../lib/remarkWikilinks';
 import remarkCallouts from '../lib/remarkCallouts';
-import rehypeHighlightAll from '../lib/rehypeHighlightAll';
 import { usePostLinkIndex } from '../lib/usePostLinkIndex';
 import { wrapSelection } from '../lib/textareaFormatting';
 import { renderInlineFormatting } from '../lib/renderInlineFormatting';
@@ -686,7 +686,7 @@ export default function PostRealtimeViewer({
         <div ref={wrapRef} className="relative flex-1 min-w-0">
         <article ref={contentArticleRef} className={`flow-root ${viewerContentProse}`}>
           {content ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkCallouts, [remarkWikilinks, { resolve: resolveWikilink }]]} rehypePlugins={[rehypeRaw, rehypeKatex, rehypeSlug, rehypeHighlightAll]} components={markdownComponents}>{content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkCallouts, [remarkWikilinks, { resolve: resolveWikilink }]]} rehypePlugins={[rehypeRaw, rehypeKatex, rehypeSlug, [rehypeHighlight, { detect: true }]]} components={markdownComponents}>{content}</ReactMarkdown>
           ) : (
             <p className="empty">아직 내용이 없습니다. 글쓰기 앱에서 이 포스트를 열어 작성해 보세요.</p>
           )}
@@ -720,7 +720,7 @@ export default function PostRealtimeViewer({
             className={`viewer-content selection-mirror-hidden absolute left-0 top-0 invisible pointer-events-none w-full h-0 overflow-hidden ${viewerContentProse}`}
             aria-hidden
           >
-            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkCallouts, [remarkWikilinks, { resolve: resolveWikilink }]]} rehypePlugins={[rehypeRaw, rehypeKatex, rehypeSlug, rehypeHighlightAll]} components={markdownComponents}>{content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkCallouts, [remarkWikilinks, { resolve: resolveWikilink }]]} rehypePlugins={[rehypeRaw, rehypeKatex, rehypeSlug, [rehypeHighlight, { detect: true }]]} components={markdownComponents}>{content}</ReactMarkdown>
           </div>
         ) : null}
         {selectionMenu && postId != null && (

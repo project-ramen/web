@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import rehypeHighlight from 'rehype-highlight';
 import rehypeSlug from 'rehype-slug';
 import { TbBold, TbItalic, TbH1, TbBlockquote, TbLink, TbCode, TbList, TbListNumbers, TbListCheck, TbPhoto } from 'react-icons/tb';
 import { getApiBase } from '../lib/apiBase';
@@ -10,7 +11,6 @@ import { setAdminPassword } from '../lib/adminAuth';
 import remarkWikilinks from '../lib/remarkWikilinks';
 import remarkCallouts from '../lib/remarkCallouts';
 import { usePostLinkIndex } from '../lib/usePostLinkIndex';
-import rehypeHighlightAll from '../lib/rehypeHighlightAll';
 
 export type PostEditorSaved = {
   slug: string;
@@ -425,7 +425,7 @@ export default function PostEditor({ mode, initial, onCancel, onSaved }: PostEdi
             <div className="flex-1 min-h-[380px] overflow-y-auto p-3">
               {body.trim() ? (
                 <article className="markdown-content leading-[1.7] flow-root">
-                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkCallouts, [remarkWikilinks, { resolve: resolveWikilink }]]} rehypePlugins={[rehypeKatex, rehypeSlug, rehypeHighlightAll]}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkCallouts, [remarkWikilinks, { resolve: resolveWikilink }]]} rehypePlugins={[rehypeKatex, rehypeSlug, [rehypeHighlight, { detect: true }]]}>
                     {body}
                   </ReactMarkdown>
                 </article>

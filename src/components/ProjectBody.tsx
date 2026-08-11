@@ -2,6 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import rehypeSlug from 'rehype-slug';
 import type { Components } from 'react-markdown';
@@ -9,7 +10,6 @@ import { CodeBlockWithCopy } from './CodeBlockWithCopy';
 import remarkWikilinks from '../lib/remarkWikilinks';
 import remarkCallouts from '../lib/remarkCallouts';
 import { usePostLinkIndex } from '../lib/usePostLinkIndex';
-import rehypeHighlightAll from '../lib/rehypeHighlightAll';
 
 /** Parse title "width:50%" or "width: 200px" → style (same as app). */
 function imageWidthStyle(title: string | undefined): React.CSSProperties | undefined {
@@ -45,7 +45,7 @@ export default function ProjectBody({ content }: ProjectBodyProps) {
   const { resolve } = usePostLinkIndex();
   return (
     <div className="project-body-markdown markdown-content">
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkCallouts, [remarkWikilinks, { resolve }]]} rehypePlugins={[rehypeRaw, rehypeKatex, rehypeSlug, rehypeHighlightAll]} components={markdownComponents}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkCallouts, [remarkWikilinks, { resolve }]]} rehypePlugins={[rehypeRaw, rehypeKatex, rehypeSlug, [rehypeHighlight, { detect: true }]]} components={markdownComponents}>
         {content}
       </ReactMarkdown>
     </div>
