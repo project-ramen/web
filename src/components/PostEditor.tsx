@@ -18,6 +18,8 @@ export type PostEditorSaved = {
   body_md: string;
   published: number;
   tags: string[];
+  banner?: string | null;
+  description?: string | null;
 };
 
 type PostEditorProps = {
@@ -28,6 +30,13 @@ type PostEditorProps = {
     body_md: string;
     published: number;
     tags?: string[];
+    /** 아래 셋은 이 화면에 편집 UI가 없어도(category, html_mode) 저장 시 그대로 보존해야 함 —
+     *  /api/posts/ensure가 upsert라 안 보낸 필드는 null/빈 배열로 덮어써서 지워지기 때문. */
+    banner?: string | null;
+    banner_url?: string | null;
+    description?: string | null;
+    category?: string[];
+    html_mode?: number;
   };
   onCancel: () => void;
   onSaved: (saved: PostEditorSaved) => void;
@@ -170,14 +179,19 @@ export default function PostEditor({ mode, initial, onCancel, onSaved }: PostEdi
   const [body, setBody] = useState(initial?.body_md ?? '');
   const [published, setPublished] = useState(Boolean(initial?.published));
   const [tagsInput, setTagsInput] = useState((initial?.tags ?? []).join(', '));
+  const [banner, setBanner] = useState(initial?.banner ?? '');
+  const [bannerUrl, setBannerUrl] = useState(initial?.banner_url ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
   const [password, setPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'write' | 'preview'>('write');
   const [uploading, setUploading] = useState(false);
+  const [bannerUploading, setBannerUploading] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerFileInputRef = useRef<HTMLInputElement>(null);
 
   if (mode === 'create' && !slugTouched && slugNormalize(title) !== slug) {
     setSlug(slugNormalize(title));
@@ -232,6 +246,37 @@ export default function PostEditor({ mode, initial, onCancel, onSaved }: PostEdi
     }
   };
 
+  const uploadBannerImage = async (file: File) => {
+    if (!password.trim()) {
+      setError('배너 이미지를 업로드하려면 관리자 비밀번호를 먼저 입력하세요.');
+      return;
+    }
+    setError('');
+    setBannerUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${getApiBase()}/api/uploads`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${password.trim()}` },
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `이미지 업로드 실패 (${res.status})`);
+      setBanner(data.url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '배너 이미지 업로드에 실패했습니다.');
+    } finally {
+      setBannerUploading(false);
+    }
+  };
+
+  const handleBannerFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) void uploadBannerImage(file);
+  };
+
   const handleImageButtonClick = () => fileInputRef.current?.click();
 
   const handleImageFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -277,6 +322,12 @@ export default function PostEditor({ mode, initial, onCancel, onSaved }: PostEdi
           body_md: body,
           published: published ? 1 : 0,
           tags,
+          banner: banner.trim() || null,
+          banner_url: bannerUrl.trim() || null,
+          description: description.trim() || null,
+          // 이 화면에 편집 UI가 없는 필드들 — 안 보내면 ensure가 upsert라 null/빈 배열로 지워버림
+          category: initial?.category ?? [],
+          html_mode: initial?.html_mode ?? 0,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -287,7 +338,15 @@ export default function PostEditor({ mode, initial, onCancel, onSaved }: PostEdi
         throw new Error(data?.error || `저장 실패 (${res.status})`);
       }
       setAdminPassword(password.trim());
-      onSaved({ slug: data.slug ?? slug.trim(), title: title.trim(), body_md: body, published: published ? 1 : 0, tags });
+      onSaved({
+        slug: data.slug ?? slug.trim(),
+        title: title.trim(),
+        body_md: body,
+        published: published ? 1 : 0,
+        tags,
+        banner: banner.trim() || null,
+        description: description.trim() || null,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : '저장에 실패했습니다.');
     } finally {
@@ -309,6 +368,77 @@ export default function PostEditor({ mode, initial, onCancel, onSaved }: PostEdi
         >
           취소
         </button>
+      </div>
+
+      <div className="flex flex-col gap-2 p-3 border border-neutral-200 dark:border-neutral-600 rounded-lg bg-neutral-50 dark:bg-neutral-800/40">
+        <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">배너</span>
+        <div className="flex items-start gap-3">
+          {banner ? (
+            <img
+              src={banner}
+              alt="배너 미리보기"
+              className="w-32 h-20 object-cover rounded-md border border-neutral-200 dark:border-neutral-600 bg-white dark:bg-neutral-900 shrink-0"
+            />
+          ) : (
+            <div className="w-32 h-20 flex items-center justify-center rounded-md border border-dashed border-neutral-300 dark:border-neutral-600 text-neutral-400 dark:text-neutral-500 text-xs shrink-0">
+              없음
+            </div>
+          )}
+          <div className="flex flex-col gap-2 flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => bannerFileInputRef.current?.click()}
+                disabled={saving || bannerUploading}
+                className="py-1.5 px-3 text-xs font-medium border border-neutral-200 dark:border-neutral-600 rounded-md bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-200 cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50"
+              >
+                {bannerUploading ? '업로드 중…' : banner ? '이미지 변경' : '이미지 업로드'}
+              </button>
+              {banner && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBanner('');
+                    setBannerUrl('');
+                  }}
+                  disabled={saving || bannerUploading}
+                  className="py-1.5 px-3 text-xs font-medium border border-transparent rounded-md text-red-600 dark:text-red-400 cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50"
+                >
+                  배너 삭제
+                </button>
+              )}
+              <input
+                ref={bannerFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleBannerFileSelected}
+                className="hidden"
+              />
+            </div>
+            {banner && (
+              <input
+                type="text"
+                value={bannerUrl}
+                onChange={(e) => setBannerUrl(e.target.value)}
+                disabled={saving}
+                placeholder="배너 클릭 시 이동할 링크 (선택)"
+                className="w-full py-1.5 px-2.5 border border-neutral-200 dark:border-neutral-600 rounded-md text-xs bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-400 dark:focus:ring-neutral-500"
+              />
+            )}
+          </div>
+        </div>
+        <label htmlFor="post-editor-description-input" className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mt-1">
+          설명 (목록·검색에 노출되는 요약)
+        </label>
+        <textarea
+          id="post-editor-description-input"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          disabled={saving}
+          rows={2}
+          placeholder="글 요약을 입력하세요 (비워두면 표시되지 않습니다)"
+          className="w-full py-1.5 px-2.5 border border-neutral-200 dark:border-neutral-600 rounded-md text-xs bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 resize-y focus:outline-none focus:ring-2 focus:ring-neutral-400 dark:focus:ring-neutral-500"
+        />
       </div>
 
       <div className="flex flex-col gap-1">

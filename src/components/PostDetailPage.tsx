@@ -11,7 +11,20 @@ import { slugToNumericId } from '../lib/slugId.js';
 import { getApiBase } from '../lib/apiBase';
 import { renderInlineFormatting } from '../lib/renderInlineFormatting';
 
-type Post = { id: number; slug: string; title: string; body_md: string; published: number; created_at: string; category?: string[] };
+type Post = {
+  id: number;
+  slug: string;
+  title: string;
+  body_md: string;
+  published: number;
+  created_at: string;
+  category?: string[];
+  tags?: string[];
+  banner?: string | null;
+  banner_url?: string | null;
+  description?: string | null;
+  html_mode?: number;
+};
 type DeletedPost = { id: number; slug: string; title: string; body_md: string; deleted: true; deleted_at: string; category?: string[] };
 type Comment = {
   id: number;
@@ -127,13 +140,22 @@ export default function PostDetailPage({ slug }: Props) {
       .then((p: Post | DeletedPost | null) => {
         if (cancelled) return;
         if (!p) { setPost(null); return; }
-        // category가 JSON 문자열로 오는 경우 파싱
+        // category/tags가 JSON 문자열로 오는 경우 파싱 (편집 시 그대로 보존해서 저장하지 않으면
+        // /api/posts/ensure가 안 보낸 필드를 null/빈 배열로 덮어써서 값이 사라짐)
         if (typeof (p as { category?: unknown }).category === 'string') {
           try {
             (p as Post).category = JSON.parse((p as unknown as { category: string }).category) as string[];
             if (!Array.isArray((p as Post).category)) (p as Post).category = [];
           } catch {
             (p as Post).category = [];
+          }
+        }
+        if (typeof (p as { tags?: unknown }).tags === 'string') {
+          try {
+            (p as Post).tags = JSON.parse((p as unknown as { tags: string }).tags) as string[];
+            if (!Array.isArray((p as Post).tags)) (p as Post).tags = [];
+          } catch {
+            (p as Post).tags = [];
           }
         }
         const postId = slugToNumericId(p.slug);
@@ -268,6 +290,12 @@ export default function PostDetailPage({ slug }: Props) {
             title: normalPost.title,
             body_md: normalPost.body_md ?? '',
             published: normalPost.published,
+            tags: normalPost.tags,
+            category: normalPost.category,
+            banner: normalPost.banner,
+            banner_url: normalPost.banner_url,
+            description: normalPost.description,
+            html_mode: normalPost.html_mode,
           }}
           onCancel={() => {
             window.location.href = `/post/${slug}`;
