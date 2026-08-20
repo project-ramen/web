@@ -24,7 +24,13 @@ const isAbout = pathname === '/about' || pathname.startsWith('/about/');
     <title>{title}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Jua&display=swap" rel="stylesheet" />
+    <!-- Google Fonts CSS를 동기 <link rel=stylesheet>로 받으면 그 요청이 끝날 때까지 렌더링이
+         막혀 LCP가 늦어짐(PSI "렌더링 차단 요청" 지적, ~1.2s). preload로 미리 받아두면서
+         media=print 트릭으로 렌더 블로킹 없이 로드하고, onload에서 media=all로 바꿔 실제 적용.
+         JS 꺼진 환경 대비 noscript로 원래 동기 로드 fallback. -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Jua&display=swap" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Jua&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Jua&display=swap" rel="stylesheet" /></noscript>
     <script is:inline>
       (function() {
         var stored = localStorage.getItem('theme');
