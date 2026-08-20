@@ -17,6 +17,10 @@ function normalize(s: string): string {
  * Obsidian 위키링크([[파일 이름|별칭]])의 대상이 실제 게시된 글이면 클릭 가능한 링크로,
  * 실제 제목은 hover 툴팁으로 보여줄 수 있게 해준다.
  * 매칭 안 되면 remarkWikilinks가 알아서 텍스트로만 표시한다.
+ *
+ * /api/posts, /api/posts/projects는 서버에서 ETag 기반 조건부 GET을 쓰므로(server/src/api.ts
+ * getPostsFreshnessMarker 참고) 별도 cache 옵션 없이 그냥 fetch — 데이터가 안 바뀌었으면
+ * 브라우저가 자동으로 304를 받고 캐시된 응답을 재사용, 바뀌었으면 즉시 최신 데이터를 받는다.
  */
 export function usePostLinkIndex() {
   const mapRef = useRef<Map<string, ResolvedPostLink>>(new Map());
@@ -29,11 +33,9 @@ export function usePostLinkIndex() {
 
     async function load() {
       try {
-        // cache: 'no-store' — 브라우저/중간 캐시가 이전 published 상태를 들고 있으면
-        // 방금 공개로 전환한 글의 위키링크가 안 걸리는 문제가 생길 수 있어 항상 최신 상태를 받는다.
         const [posts, projects] = await Promise.all([
-          fetch(`${base}/api/posts`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : [])),
-          fetch(`${base}/api/posts/projects`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : [])),
+          fetch(`${base}/api/posts`).then((r) => (r.ok ? r.json() : [])),
+          fetch(`${base}/api/posts/projects`).then((r) => (r.ok ? r.json() : [])),
         ]);
         if (cancelled) return;
 

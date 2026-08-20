@@ -1,7 +1,7 @@
 {
   "name": "ramen-blog-web",
   "type": "module",
-  "version": "1.5.15",
+  "version": "1.5.16",
   "private": true,
   "packageManager": "bun@1.1.0",
   "engines": {
