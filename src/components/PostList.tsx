@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { FiArrowDown, FiArrowUp, FiCalendar, FiChevronDown, FiChevronRight, FiMessageCircle, FiPlus, FiSearch, FiSliders, FiTag, FiX } from 'react-icons/fi';
+import { FiCalendar, FiChevronDown, FiChevronRight, FiMessageCircle, FiPlus, FiSearch, FiSliders, FiTag, FiX } from 'react-icons/fi';
+import { LuArrowUpDown } from 'react-icons/lu';
 import { slugToNumericId } from '../lib/slugId.js';
 
 import { getApiBase } from '../lib/apiBase';
@@ -159,6 +160,46 @@ function CategoryTreeList({
   );
 }
 
+/** 슬라이딩 하이라이트가 있는 세그먼트 라디오 그룹 (정렬 드롭다운용) */
+function SegmentedGroup<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  const index = Math.max(0, options.findIndex((o) => o.value === value));
+  return (
+    <div
+      className="relative grid p-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800"
+      style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }}
+      role="radiogroup"
+    >
+      <div
+        className="absolute inset-y-0.5 left-0.5 rounded-full bg-neutral-900 dark:bg-neutral-100 transition-transform duration-200 ease-out"
+        style={{ width: `calc((100% - 4px) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
+        aria-hidden
+      />
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={o.value === value}
+          onClick={() => onChange(o.value)}
+          className={`relative z-10 px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+            o.value === value ? 'text-neutral-100 dark:text-neutral-900' : 'text-neutral-600 dark:text-neutral-300'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function PostListSkeleton() {
   const bar = 'rounded-md bg-neutral-200 dark:bg-neutral-700';
   return (
@@ -284,13 +325,15 @@ export default function PostList() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  // 설정 아이콘으로 여닫는, 정렬/카테고리를 담은 확장 패널
+  // 설정 아이콘으로 여닫는, 카테고리를 담은 확장 패널
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
+  const [sortPanelOpen, setSortPanelOpen] = useState(false);
   const [expandedCategoryPaths, setExpandedCategoryPaths] = useState<Set<string>>(new Set());
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const categoryPanelRef = useRef<HTMLDivElement>(null);
+  const sortPanelRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // 검색창에 tag:/date:/before:/after: 토큰으로 넣은 필터 — 디바운스된 값 기준으로 뽑아서 서버 요청에 씀
@@ -401,6 +444,17 @@ export default function PostList() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [categoryPanelOpen]);
+
+  useEffect(() => {
+    if (!sortPanelOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (sortPanelRef.current && !sortPanelRef.current.contains(e.target as Node)) {
+        setSortPanelOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [sortPanelOpen]);
 
   // 검색창 자동완성 드롭다운 바깥 클릭하면 닫기
   useEffect(() => {
@@ -639,16 +693,58 @@ export default function PostList() {
               type="button"
               onClick={() => setSettingsOpen((o) => !o)}
               className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
-                settingsOpen || categoryFilter.length > 0 || sortBy !== 'created_at' || sortOrder !== 'desc'
+                settingsOpen || categoryFilter.length > 0
                   ? 'bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900'
                   : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700'
               }`}
               aria-expanded={settingsOpen}
-              aria-label={settingsOpen ? '정렬·카테고리 패널 닫기' : '정렬·카테고리 패널 열기'}
-              title="정렬 · 카테고리"
+              aria-label={settingsOpen ? '카테고리 패널 닫기' : '카테고리 패널 열기'}
+              title="카테고리"
             >
               <FiSliders className="w-4 h-4" aria-hidden />
             </button>
+            <div className="relative" ref={sortPanelRef}>
+              <button
+                type="button"
+                onClick={() => setSortPanelOpen((o) => !o)}
+                className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
+                  sortPanelOpen || sortBy !== 'created_at' || sortOrder !== 'desc'
+                    ? 'bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900'
+                    : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                }`}
+                aria-expanded={sortPanelOpen}
+                aria-label={sortPanelOpen ? '정렬 패널 닫기' : '정렬 패널 열기'}
+                title="정렬"
+              >
+                <LuArrowUpDown className="w-4 h-4" aria-hidden />
+              </button>
+              {sortPanelOpen && (
+                <div className="absolute right-0 z-10 mt-1 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-lg flex flex-col gap-3">
+                  <div>
+                    <p className="mb-1.5 text-xs text-neutral-400 dark:text-neutral-500">기준</p>
+                    <SegmentedGroup
+                      options={[
+                        { value: 'created_at' as const, label: '작성일' },
+                        { value: 'updated_at' as const, label: '수정일' },
+                      ]}
+                      value={sortBy}
+                      onChange={setSortBy}
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-1.5 text-xs text-neutral-400 dark:text-neutral-500">순서</p>
+                    <SegmentedGroup
+                      options={[
+                        { value: 'desc' as const, label: '최신순' },
+                        { value: 'asc' as const, label: '오래된순' },
+                      ]}
+                      value={sortOrder}
+                      onChange={setSortOrder}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="relative" ref={searchBoxRef}>
               <div
                 className="flex items-center overflow-hidden rounded-full bg-neutral-50 dark:bg-neutral-800 transition-[width] duration-300 ease-out"
@@ -779,26 +875,6 @@ export default function PostList() {
                   })}
                 </div>
               )}
-              <span className="ml-auto inline-flex items-center gap-1.5">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-neutral-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-neutral-400 dark:focus:ring-neutral-500"
-                  aria-label="정렬 기준"
-                >
-                  <option value="created_at">작성일</option>
-                  <option value="updated_at">수정일</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
-                  title={sortOrder === 'desc' ? '최신순 (클릭 시 오래된순)' : '오래된순 (클릭 시 최신순)'}
-                  aria-label={sortOrder === 'desc' ? '최신순, 클릭하면 오래된순으로 변경' : '오래된순, 클릭하면 최신순으로 변경'}
-                >
-                  {sortOrder === 'desc' ? <FiArrowDown className="w-4 h-4" aria-hidden /> : <FiArrowUp className="w-4 h-4" aria-hidden />}
-                </button>
-              </span>
             </div>
           </div>
         </div>
