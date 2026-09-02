@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FiArrowDown, FiArrowUp, FiCalendar, FiChevronDown, FiChevronRight, FiMessageCircle, FiPlus, FiSearch, FiSliders, FiTag, FiX } from 'react-icons/fi';
 import { slugToNumericId } from '../lib/slugId.js';
 
@@ -283,6 +283,7 @@ export default function PostList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   // 설정 아이콘으로 여닫는, 정렬/카테고리를 담은 확장 패널
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
@@ -486,6 +487,11 @@ export default function PostList() {
     return null;
   }, [searchFocused, searchQuery, tags]);
 
+  // suggestions가 (내용은 같아도) 바뀔 때마다 방향키 하이라이트를 처음부터 다시 셈
+  useEffect(() => {
+    setHighlightedIndex(-1);
+  }, [suggestions]);
+
   /** 검색창에서 입력 중이던 마지막 토큰을 완성된 토큰(+뒤 공백)으로 바꿔치기 */
   function replaceActiveToken(replacement: string) {
     const parts = searchQuery.split(/\s+/);
@@ -501,6 +507,84 @@ export default function PostList() {
     { label: '올해 시작', value: `${new Date().getFullYear()}-01-01` },
   ];
 
+  /** 자동완성 드롭다운에 실제로 뜨는 선택 가능한 행 — 방향키 이동·클릭 둘 다 이 배열 기준으로 동작 */
+  type SuggestionRow = { key: string; content: ReactNode; onSelect: () => void };
+  const suggestionRows: SuggestionRow[] = useMemo(() => {
+    if (!suggestions) return [];
+    if (suggestions.kind === 'prefix') {
+      return suggestions.list.map((p) => ({
+        key: `prefix-${p}`,
+        onSelect: () => replaceActiveToken(`${p}:`),
+        content: (
+          <>
+            <span className="font-mono text-neutral-500 dark:text-neutral-400">{p}:</span>{' '}
+            {p === 'tag' ? '태그로 필터' : p === 'date' ? '작성일로 필터' : p === 'after' ? '이후 작성된 글' : '이전에 작성된 글'}
+          </>
+        ),
+      }));
+    }
+    if (suggestions.kind === 'tag') {
+      return suggestions.list.map((t) => ({
+        key: `tag-${t.tag}`,
+        onSelect: () => replaceActiveToken(`tag:${t.tag}`),
+        content: (
+          <span className="w-full flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 min-w-0">
+              <FiTag className="w-3 h-3 shrink-0" aria-hidden />
+              <span className="truncate">{t.tag}</span>
+            </span>
+            <span className="text-xs text-neutral-400 dark:text-neutral-500 shrink-0">{t.count}</span>
+          </span>
+        ),
+      }));
+    }
+    // date
+    const rows: SuggestionRow[] = [];
+    if (suggestions.subOptions.includes('pre')) {
+      rows.push({
+        key: 'date-pre',
+        onSelect: () => replaceActiveToken('date:pre:'),
+        content: <><span className="font-mono text-neutral-500 dark:text-neutral-400">date:pre:</span> 이 날짜 이전</>,
+      });
+    }
+    if (suggestions.subOptions.includes('post')) {
+      rows.push({
+        key: 'date-post',
+        onSelect: () => replaceActiveToken('date:post:'),
+        content: <><span className="font-mono text-neutral-500 dark:text-neutral-400">date:post:</span> 이 날짜 이후</>,
+      });
+    }
+    for (const d of datePresets) {
+      rows.push({
+        key: `date-preset-${d.label}`,
+        onSelect: () => replaceActiveToken(`${suggestions.insertPrefix}${d.value}`),
+        content: <>{d.label} <span className="text-xs text-neutral-400 dark:text-neutral-500">({d.value})</span></>,
+      });
+    }
+    return rows;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestions]);
+
+  /** 검색창 방향키/엔터/esc로 자동완성 드롭다운 조작 */
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (suggestionRows.length === 0) {
+      if (e.key === 'Escape') setSearchFocused(false);
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex((i) => (i + 1) % suggestionRows.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex((i) => (i <= 0 ? suggestionRows.length - 1 : i - 1));
+    } else if (e.key === 'Enter' && highlightedIndex >= 0) {
+      e.preventDefault();
+      suggestionRows[highlightedIndex].onSelect();
+    } else if (e.key === 'Escape') {
+      setSearchFocused(false);
+    }
+  }
+
   const newPostButton = (
     <a
       href="/post/new"
@@ -511,31 +595,8 @@ export default function PostList() {
     </a>
   );
 
-  if (loading)
-    return (
-      <>
-        <div className="mb-4">{newPostButton}</div>
-        <PostListSkeleton />
-      </>
-    );
-  if (error)
-    return (
-      <>
-        <div className="mb-4">{newPostButton}</div>
-        <p className="text-neutral-600 dark:text-neutral-400">목록을 불러올 수 없습니다. ({error}) 서버가 실행 중인지 확인하세요.</p>
-      </>
-    );
-  const hasActiveFilter =
-    categoryFilter.length > 0 || !!parsedSearch.text.trim() || !!parsedSearch.tag || !!parsedSearch.dateFrom || !!parsedSearch.dateTo;
-
-  if (total === 0 && !hasActiveFilter)
-    return (
-      <>
-        <div className="mb-4">{newPostButton}</div>
-        <p className="text-neutral-600 dark:text-neutral-400">등록된 포스트가 없습니다.</p>
-      </>
-    );
-
+  // loading/error 여부로 트리 전체를 바꿔치기하지 않음 — 검색창을 포함한 툴바가 매번 언마운트/재마운트
+  // 되면서 타이핑 중 focus가 풀리는 문제가 있었음. 툴바는 항상 유지하고, 결과 영역만 상태에 따라 바뀜.
   return (
     <>
       <div className="mb-4">
@@ -607,81 +668,35 @@ export default function PostList() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setSearchFocused(true)}
+                  onKeyDown={handleSearchKeyDown}
                   placeholder="제목… tag:태그 date:2024-01-01"
                   className="shrink min-w-0 w-[228px] h-8 pr-3 bg-transparent border-none text-neutral-900 dark:text-neutral-100 text-sm placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none"
-                  aria-label="포스트 검색 (tag:, date:, before:, after: 필터 가능)"
+                  aria-label="포스트 검색 (tag:, date:, before:, after: 필터 가능, 방향키로 자동완성 선택)"
                 />
               </div>
               {searchOpen && suggestions && (
                 <div className="absolute right-0 z-10 mt-1 min-w-[210px] max-w-[280px] max-h-64 overflow-y-auto p-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-lg">
-                  {suggestions.kind === 'prefix' &&
-                    suggestions.list.map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => replaceActiveToken(`${p}:`)}
-                        className="block w-full text-left px-2 py-1.5 rounded text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                      >
-                        <span className="font-mono text-neutral-500 dark:text-neutral-400">{p}:</span>{' '}
-                        {p === 'tag' ? '태그로 필터' : p === 'date' ? '작성일로 필터' : p === 'after' ? '이후 작성된 글' : '이전에 작성된 글'}
-                      </button>
-                    ))}
-                  {suggestions.kind === 'tag' &&
-                    (suggestions.list.length > 0 ? (
-                      suggestions.list.map((t) => (
-                        <button
-                          key={t.tag}
-                          type="button"
-                          onClick={() => replaceActiveToken(`tag:${t.tag}`)}
-                          className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                        >
-                          <span className="inline-flex items-center gap-1.5 min-w-0">
-                            <FiTag className="w-3 h-3 shrink-0" aria-hidden />
-                            <span className="truncate">{t.tag}</span>
-                          </span>
-                          <span className="text-xs text-neutral-400 dark:text-neutral-500 shrink-0">{t.count}</span>
-                        </button>
-                      ))
-                    ) : (
-                      <p className="px-2 py-1.5 text-xs text-neutral-400 dark:text-neutral-500">일치하는 태그가 없습니다.</p>
-                    ))}
-                  {suggestions.kind === 'date' && (
-                    <>
-                      {suggestions.subOptions.length > 0 && (
-                        <>
-                          {suggestions.subOptions.includes('pre') && (
-                            <button
-                              type="button"
-                              onClick={() => replaceActiveToken('date:pre:')}
-                              className="block w-full text-left px-2 py-1.5 rounded text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                            >
-                              <span className="font-mono text-neutral-500 dark:text-neutral-400">date:pre:</span> 이 날짜 이전
-                            </button>
-                          )}
-                          {suggestions.subOptions.includes('post') && (
-                            <button
-                              type="button"
-                              onClick={() => replaceActiveToken('date:post:')}
-                              className="block w-full text-left px-2 py-1.5 rounded text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                            >
-                              <span className="font-mono text-neutral-500 dark:text-neutral-400">date:post:</span> 이 날짜 이후
-                            </button>
-                          )}
-                        </>
-                      )}
-                      <p className="px-2 pt-1 pb-1.5 text-xs text-neutral-400 dark:text-neutral-500">YYYY-MM-DD로 직접 입력하거나:</p>
-                      {datePresets.map((d) => (
-                        <button
-                          key={d.label}
-                          type="button"
-                          onClick={() => replaceActiveToken(`${suggestions.insertPrefix}${d.value}`)}
-                          className="block w-full text-left px-2 py-1.5 rounded text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                        >
-                          {d.label} <span className="text-xs text-neutral-400 dark:text-neutral-500">({d.value})</span>
-                        </button>
-                      ))}
-                    </>
+                  {suggestions.kind === 'tag' && suggestionRows.length === 0 && (
+                    <p className="px-2 py-1.5 text-xs text-neutral-400 dark:text-neutral-500">일치하는 태그가 없습니다.</p>
                   )}
+                  {suggestions.kind === 'date' && (
+                    <p className="px-2 pt-1 pb-1.5 text-xs text-neutral-400 dark:text-neutral-500">YYYY-MM-DD로 직접 입력하거나:</p>
+                  )}
+                  {suggestionRows.map((row, i) => (
+                    <button
+                      key={row.key}
+                      type="button"
+                      onMouseEnter={() => setHighlightedIndex(i)}
+                      onClick={row.onSelect}
+                      className={`block w-full text-left px-2 py-1.5 rounded text-sm ${
+                        i === highlightedIndex
+                          ? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100'
+                          : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                      }`}
+                    >
+                      {row.content}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -788,7 +803,11 @@ export default function PostList() {
           </div>
         </div>
       </div>
-      {total === 0 ? (
+      {loading ? (
+        <PostListSkeleton />
+      ) : error ? (
+        <p className="text-neutral-600 dark:text-neutral-400">목록을 불러올 수 없습니다. ({error}) 서버가 실행 중인지 확인하세요.</p>
+      ) : total === 0 ? (
         <p className="text-neutral-500 dark:text-neutral-400 text-sm">
           {parsedSearch.text.trim() || parsedSearch.tag || parsedSearch.dateFrom || parsedSearch.dateTo
             ? '검색 결과가 없습니다.'
