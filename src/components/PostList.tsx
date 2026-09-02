@@ -189,7 +189,7 @@ function SegmentedGroup<T extends string>({
           role="radio"
           aria-checked={o.value === value}
           onClick={() => onChange(o.value)}
-          className={`relative z-10 px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+          className={`relative z-10 flex items-center justify-center w-full px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
             o.value === value ? 'text-neutral-100 dark:text-neutral-900' : 'text-neutral-600 dark:text-neutral-300'
           }`}
         >
@@ -722,14 +722,15 @@ export default function PostList() {
                 <div className="absolute right-0 z-10 mt-1 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-lg flex flex-col gap-3">
                   <div>
                     <p className="mb-1.5 text-xs text-neutral-400 dark:text-neutral-500">기준</p>
-                    <SegmentedGroup
-                      options={[
-                        { value: 'created_at' as const, label: '작성일' },
-                        { value: 'updated_at' as const, label: '수정일' },
-                      ]}
+                    <select
                       value={sortBy}
-                      onChange={setSortBy}
-                    />
+                      onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                      className="w-full px-3 py-1.5 rounded-lg text-sm font-medium text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-neutral-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-neutral-400 dark:focus:ring-neutral-500"
+                      aria-label="정렬 기준"
+                    >
+                      <option value="created_at">작성일</option>
+                      <option value="updated_at">수정일</option>
+                    </select>
                   </div>
                   <div>
                     <p className="mb-1.5 text-xs text-neutral-400 dark:text-neutral-500">순서</p>
