@@ -198,13 +198,19 @@ type FilterPrefix = (typeof FILTER_PREFIXES)[number];
 
 type ParsedSearch = { text: string; tag: string; dateFrom: string; dateTo: string };
 
-/** "설계 tag:frontend after:2024-01-01" 같은 입력에서 필터 토큰을 뽑아내고, 나머지를 자유 검색어로 남김 */
+/**
+ * "설계 tag:frontend after:2024-01-01" 같은 입력에서 필터 토큰을 뽑아내고, 나머지를 자유 검색어로 남김.
+ * date:는 세 형태 지원 — date:2024-01-01(그 날), date:pre:2024-01-01(그 이전 = before), date:post:2024-01-01(그 이후 = after).
+ * before:/after: 단독 토큰도 그대로 지원(둘 다 있어도 동작 동일, 취향껏 쓰면 됨).
+ */
 function parseSearchInput(raw: string): ParsedSearch {
   let tag = '';
   let dateFrom = '';
   let dateTo = '';
   const text = raw
     .replace(/\btag:(\S+)/gi, (_, v: string) => { tag = v; return ''; })
+    .replace(/\bdate:pre:(\d{4}-\d{2}-\d{2})/gi, (_, v: string) => { dateTo = v; return ''; })
+    .replace(/\bdate:post:(\d{4}-\d{2}-\d{2})/gi, (_, v: string) => { dateFrom = v; return ''; })
     .replace(/\bdate:(\d{4}-\d{2}-\d{2})/gi, (_, v: string) => { dateFrom = v; dateTo = v; return ''; })
     .replace(/\bafter:(\d{4}-\d{2}-\d{2})/gi, (_, v: string) => { dateFrom = v; return ''; })
     .replace(/\bbefore:(\d{4}-\d{2}-\d{2})/gi, (_, v: string) => { dateTo = v; return ''; })
@@ -448,8 +454,8 @@ export default function PostList() {
     if (searchOpen) searchInputRef.current?.focus();
   }, [searchOpen]);
 
-  // 검색창 자동완성 — 입력 중인 마지막 토큰이 "tag:", "date:"/"before:"/"after:"면 값 후보를,
-  // 그 앞부분(예: "ta")만 쳤으면 prefix 자체를 제안 (디스코드 검색창 필터 자동완성 흉내)
+  // 검색창 자동완성 — 포커스만 줘도(빈 토큰) prefix 목록부터 보여주고, "tag:"/"date:"/"before:"/"after:"
+  // 치면 값 후보를 제안 (디스코드 검색창 필터 자동완성 흉내). date:는 date:pre:/date:post: 서브옵션도 있음.
   const suggestions = useMemo(() => {
     if (!searchFocused) return null;
     const token = activeToken(searchQuery);
@@ -460,9 +466,20 @@ export default function PostList() {
     }
     const dateMatch = /^(date|before|after):(.*)$/i.exec(token);
     if (dateMatch) {
-      return { kind: 'date' as const, prefix: dateMatch[1].toLowerCase() as 'date' | 'before' | 'after' };
+      const prefix = dateMatch[1].toLowerCase() as 'date' | 'before' | 'after';
+      const rest = dateMatch[2];
+      if (prefix === 'date') {
+        const subMatch = /^(pre|post):/i.exec(rest);
+        if (subMatch) return { kind: 'date' as const, insertPrefix: `date:${subMatch[1].toLowerCase()}:`, subOptions: [] };
+        if (!/^\d/.test(rest)) {
+          // "date:" 갓 치거나 "date:p" 같은 중간 — pre/post 서브옵션 + 특정 날짜 프리셋 둘 다 제안
+          const subOptions = (['pre', 'post'] as const).filter((s) => s.startsWith(rest.toLowerCase()));
+          return { kind: 'date' as const, insertPrefix: 'date:', subOptions };
+        }
+      }
+      return { kind: 'date' as const, insertPrefix: `${prefix}:`, subOptions: [] };
     }
-    if (token && !token.includes(':')) {
+    if (!token.includes(':')) {
       const list = FILTER_PREFIXES.filter((p) => p.startsWith(token.toLowerCase()));
       if (list.length > 0) return { kind: 'prefix' as const, list };
     }
@@ -630,12 +647,34 @@ export default function PostList() {
                     ))}
                   {suggestions.kind === 'date' && (
                     <>
+                      {suggestions.subOptions.length > 0 && (
+                        <>
+                          {suggestions.subOptions.includes('pre') && (
+                            <button
+                              type="button"
+                              onClick={() => replaceActiveToken('date:pre:')}
+                              className="block w-full text-left px-2 py-1.5 rounded text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                            >
+                              <span className="font-mono text-neutral-500 dark:text-neutral-400">date:pre:</span> 이 날짜 이전
+                            </button>
+                          )}
+                          {suggestions.subOptions.includes('post') && (
+                            <button
+                              type="button"
+                              onClick={() => replaceActiveToken('date:post:')}
+                              className="block w-full text-left px-2 py-1.5 rounded text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                            >
+                              <span className="font-mono text-neutral-500 dark:text-neutral-400">date:post:</span> 이 날짜 이후
+                            </button>
+                          )}
+                        </>
+                      )}
                       <p className="px-2 pt-1 pb-1.5 text-xs text-neutral-400 dark:text-neutral-500">YYYY-MM-DD로 직접 입력하거나:</p>
                       {datePresets.map((d) => (
                         <button
                           key={d.label}
                           type="button"
-                          onClick={() => replaceActiveToken(`${suggestions.prefix}:${d.value}`)}
+                          onClick={() => replaceActiveToken(`${suggestions.insertPrefix}${d.value}`)}
                           className="block w-full text-left px-2 py-1.5 rounded text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                         >
                           {d.label} <span className="text-xs text-neutral-400 dark:text-neutral-500">({d.value})</span>
