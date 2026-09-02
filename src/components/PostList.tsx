@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FiArrowDown, FiArrowUp, FiChevronDown, FiChevronRight, FiMessageCircle, FiPlus, FiSearch, FiSliders } from 'react-icons/fi';
+import { FiArrowDown, FiArrowUp, FiCalendar, FiChevronDown, FiChevronRight, FiMessageCircle, FiPlus, FiSearch, FiSliders, FiTag, FiX } from 'react-icons/fi';
 import { slugToNumericId } from '../lib/slugId.js';
 
 import { getApiBase } from '../lib/apiBase';
@@ -73,6 +73,9 @@ type CategoryNode = { name: string; path: string[]; children: CategoryNode[] };
 
 /** 서버 /api/posts/categories 응답 — 존재하는 카테고리 조합 하나당 그 카테고리의 최신 글 작성일 */
 type CategoryInfo = { category: string[]; latest: string };
+
+/** 서버 /api/posts/tags 응답 */
+type TagInfo = { tag: string; count: number };
 
 function buildCategoryTree(paths: string[][]): CategoryNode[] {
   const root: CategoryNode[] = [];
@@ -189,10 +192,56 @@ function syncCategoryToUrl(categoryFilter: string[]) {
 
 const PAGE_SIZE = 20;
 
-/** /api/posts 목록 요청 쿼리스트링 조립 — 카테고리/검색/정렬/페이지 전부 서버가 처리 */
+/** 검색창 안에 디스코드처럼 넣는 필터 토큰 */
+const FILTER_PREFIXES = ['tag', 'date', 'before', 'after'] as const;
+type FilterPrefix = (typeof FILTER_PREFIXES)[number];
+
+type ParsedSearch = { text: string; tag: string; dateFrom: string; dateTo: string };
+
+/** "설계 tag:frontend after:2024-01-01" 같은 입력에서 필터 토큰을 뽑아내고, 나머지를 자유 검색어로 남김 */
+function parseSearchInput(raw: string): ParsedSearch {
+  let tag = '';
+  let dateFrom = '';
+  let dateTo = '';
+  const text = raw
+    .replace(/\btag:(\S+)/gi, (_, v: string) => { tag = v; return ''; })
+    .replace(/\bdate:(\d{4}-\d{2}-\d{2})/gi, (_, v: string) => { dateFrom = v; dateTo = v; return ''; })
+    .replace(/\bafter:(\d{4}-\d{2}-\d{2})/gi, (_, v: string) => { dateFrom = v; return ''; })
+    .replace(/\bbefore:(\d{4}-\d{2}-\d{2})/gi, (_, v: string) => { dateTo = v; return ''; })
+    .replace(/\s+/g, ' ')
+    .trim();
+  return { text, tag, dateFrom, dateTo };
+}
+
+/** 검색창에서 prefix:값 형태 토큰을 통째로 제거 (칩의 X 눌렀을 때 사용) */
+function removeFilterTokens(raw: string, prefixes: FilterPrefix[]): string {
+  const re = new RegExp(`\\b(${prefixes.join('|')}):\\S*`, 'gi');
+  return raw.replace(re, '').replace(/\s+/g, ' ').trim();
+}
+
+/** 현재 커서 위치가 아니라 마지막 공백 뒤 "입력 중인 토큰" 기준 — 작은 검색창이라 이 정도면 충분 */
+function activeToken(raw: string): string {
+  const parts = raw.split(/\s+/);
+  return parts[parts.length - 1] ?? '';
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function daysAgoIso(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** /api/posts 목록 요청 쿼리스트링 조립 — 카테고리/검색/태그/날짜/정렬/페이지 전부 서버가 처리 */
 function buildPostsQuery(opts: {
   categoryFilter: string[];
   q: string;
+  tag: string;
+  dateFrom: string;
+  dateTo: string;
   sortBy: string;
   sortOrder: string;
   offset: number;
@@ -200,6 +249,9 @@ function buildPostsQuery(opts: {
   const sp = new URLSearchParams();
   if (opts.categoryFilter.length > 0) sp.set('category', opts.categoryFilter.join('/'));
   if (opts.q.trim()) sp.set('q', opts.q.trim());
+  if (opts.tag.trim()) sp.set('tag', opts.tag.trim());
+  if (opts.dateFrom) sp.set('dateFrom', opts.dateFrom);
+  if (opts.dateTo) sp.set('dateTo', opts.dateTo);
   sp.set('sortBy', opts.sortBy);
   sp.set('sortOrder', opts.sortOrder);
   sp.set('limit', String(PAGE_SIZE));
@@ -214,6 +266,7 @@ export default function PostList() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<CategoryInfo[]>([]);
+  const [tags, setTags] = useState<TagInfo[]>([]);
   // 카테고리 선택 상태를 ?category= 쿼리에 저장 — 글 상세로 갔다가 뒤로가기해도 필터가 유지되게.
   const [categoryFilter, setCategoryFilter] = useState<string[]>(() =>
     typeof window === 'undefined' ? [] : categoryFromSearch(window.location.search)
@@ -223,11 +276,18 @@ export default function PostList() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
+  // 설정 아이콘으로 여닫는, 정렬/카테고리를 담은 확장 패널
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [expandedCategoryPaths, setExpandedCategoryPaths] = useState<Set<string>>(new Set());
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
   const categoryPanelRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // 검색창에 tag:/date:/before:/after: 토큰으로 넣은 필터 — 디바운스된 값 기준으로 뽑아서 서버 요청에 씀
+  const parsedSearch = useMemo(() => parseSearchInput(debouncedQuery), [debouncedQuery]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -255,7 +315,22 @@ export default function PostList() {
     return () => { cancelled = true; };
   }, []);
 
-  // 카테고리/검색어/정렬이 바뀌면 처음부터(offset 0) 다시 가져옴 — 이전에 쌓아둔 페이지는 버림
+  // 검색창 tag: 자동완성용 태그 목록 — 마찬가지로 한 번만 받아옴
+  useEffect(() => {
+    if (!getApiBase()) return;
+    let cancelled = false;
+    fetch(`${getApiBase()}/api/posts/tags`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+      .then((rows: TagInfo[]) => {
+        if (!cancelled) setTags(rows);
+      })
+      .catch(() => {
+        // 자동완성은 부가 기능 — 실패해도 tag: 직접 타이핑은 그대로 동작함
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // 카테고리/검색어(+태그/날짜 토큰)/정렬이 바뀌면 처음부터(offset 0) 다시 가져옴 — 쌓아둔 페이지는 버림
   useEffect(() => {
     let cancelled = false;
     if (!getApiBase()) {
@@ -264,7 +339,16 @@ export default function PostList() {
     }
     setLoading(true);
     setError(null);
-    const qs = buildPostsQuery({ categoryFilter, q: debouncedQuery, sortBy, sortOrder, offset: 0 });
+    const qs = buildPostsQuery({
+      categoryFilter,
+      q: parsedSearch.text,
+      tag: parsedSearch.tag,
+      dateFrom: parsedSearch.dateFrom,
+      dateTo: parsedSearch.dateTo,
+      sortBy,
+      sortOrder,
+      offset: 0,
+    });
     fetch(`${getApiBase()}/api/posts?${qs}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
       .then((data: { items: ApiPost[]; total: number }) => {
@@ -279,7 +363,7 @@ export default function PostList() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [categoryFilter, debouncedQuery, sortBy, sortOrder]);
+  }, [categoryFilter, parsedSearch, sortBy, sortOrder]);
 
   const categoryTree = useMemo(() => buildCategoryTree(categories.map((c) => c.category)), [categories]);
 
@@ -311,6 +395,18 @@ export default function PostList() {
     return () => document.removeEventListener('mousedown', handler);
   }, [categoryPanelOpen]);
 
+  // 검색창 자동완성 드롭다운 바깥 클릭하면 닫기
+  useEffect(() => {
+    if (!searchFocused) return;
+    const handler = (e: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+        setSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [searchFocused]);
+
   // 무한 스크롤: sentinel이 화면에 들어오면 다음 PAGE_SIZE개를 서버에서 이어서 받아옴
   const hasMore = items.length < total;
   useEffect(() => {
@@ -321,7 +417,16 @@ export default function PostList() {
       (entries) => {
         if (!entries[0]?.isIntersecting) return;
         setLoadingMore(true);
-        const qs = buildPostsQuery({ categoryFilter, q: debouncedQuery, sortBy, sortOrder, offset: items.length });
+        const qs = buildPostsQuery({
+          categoryFilter,
+          q: parsedSearch.text,
+          tag: parsedSearch.tag,
+          dateFrom: parsedSearch.dateFrom,
+          dateTo: parsedSearch.dateTo,
+          sortBy,
+          sortOrder,
+          offset: items.length,
+        });
         fetch(`${getApiBase()}/api/posts?${qs}`)
           .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
           .then((data: { items: ApiPost[]; total: number }) => {
@@ -337,11 +442,47 @@ export default function PostList() {
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [loading, loadingMore, hasMore, items.length, categoryFilter, debouncedQuery, sortBy, sortOrder]);
+  }, [loading, loadingMore, hasMore, items.length, categoryFilter, parsedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus();
   }, [searchOpen]);
+
+  // 검색창 자동완성 — 입력 중인 마지막 토큰이 "tag:", "date:"/"before:"/"after:"면 값 후보를,
+  // 그 앞부분(예: "ta")만 쳤으면 prefix 자체를 제안 (디스코드 검색창 필터 자동완성 흉내)
+  const suggestions = useMemo(() => {
+    if (!searchFocused) return null;
+    const token = activeToken(searchQuery);
+    const tagMatch = /^tag:(.*)$/i.exec(token);
+    if (tagMatch) {
+      const partial = tagMatch[1].toLowerCase();
+      return { kind: 'tag' as const, list: tags.filter((t) => t.tag.toLowerCase().includes(partial)).slice(0, 8) };
+    }
+    const dateMatch = /^(date|before|after):(.*)$/i.exec(token);
+    if (dateMatch) {
+      return { kind: 'date' as const, prefix: dateMatch[1].toLowerCase() as 'date' | 'before' | 'after' };
+    }
+    if (token && !token.includes(':')) {
+      const list = FILTER_PREFIXES.filter((p) => p.startsWith(token.toLowerCase()));
+      if (list.length > 0) return { kind: 'prefix' as const, list };
+    }
+    return null;
+  }, [searchFocused, searchQuery, tags]);
+
+  /** 검색창에서 입력 중이던 마지막 토큰을 완성된 토큰(+뒤 공백)으로 바꿔치기 */
+  function replaceActiveToken(replacement: string) {
+    const parts = searchQuery.split(/\s+/);
+    parts[parts.length - 1] = replacement;
+    setSearchQuery(parts.join(' ').replace(/^\s+/, ''));
+    searchInputRef.current?.focus();
+  }
+
+  const datePresets: { label: string; value: string }[] = [
+    { label: '오늘', value: todayIso() },
+    { label: '1주 전', value: daysAgoIso(7) },
+    { label: '1개월 전', value: daysAgoIso(30) },
+    { label: '올해 시작', value: `${new Date().getFullYear()}-01-01` },
+  ];
 
   const newPostButton = (
     <a
@@ -367,7 +508,10 @@ export default function PostList() {
         <p className="text-neutral-600 dark:text-neutral-400">목록을 불러올 수 없습니다. ({error}) 서버가 실행 중인지 확인하세요.</p>
       </>
     );
-  if (total === 0 && categoryFilter.length === 0 && !debouncedQuery.trim())
+  const hasActiveFilter =
+    categoryFilter.length > 0 || !!parsedSearch.text.trim() || !!parsedSearch.tag || !!parsedSearch.dateFrom || !!parsedSearch.dateTo;
+
+  if (total === 0 && !hasActiveFilter)
     return (
       <>
         <div className="mb-4">{newPostButton}</div>
@@ -377,127 +521,237 @@ export default function PostList() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        {newPostButton}
-        <div
-          className="flex items-center overflow-hidden rounded-full bg-neutral-50 dark:bg-neutral-800 transition-[width] duration-300 ease-out"
-          style={{ width: searchOpen ? 200 : 32 }}
-        >
-          <button
-            type="button"
-            onClick={() => setSearchOpen((o) => !o)}
-            className="shrink-0 w-8 h-8 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-full transition-colors"
-            aria-label={searchOpen ? '검색 닫기' : '검색'}
-          >
-            <FiSearch className="w-4 h-4" aria-hidden />
-          </button>
-          <input
-            ref={searchInputRef}
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="제목, 태그, 카테고리…"
-            className="shrink min-w-0 w-[168px] h-8 pr-3 bg-transparent border-none text-neutral-900 dark:text-neutral-100 text-sm placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none"
-            aria-label="포스트 검색"
-          />
-        </div>
-        {categoryTree.length > 0 && (
-          <div className="relative" ref={categoryPanelRef}>
-            <button
-              type="button"
-              onClick={() => setCategoryPanelOpen((o) => !o)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                categoryFilter.length > 0
-                  ? 'bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900'
-                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-              }`}
-              aria-expanded={categoryPanelOpen}
-              aria-label="카테고리 필터"
-            >
-              카테고리{categoryFilter.length > 0 ? `: ${categoryFilter.join(' › ')}` : ''}
-              <FiChevronDown className={`w-4 h-4 shrink-0 transition-transform ${categoryPanelOpen ? 'rotate-180' : ''}`} aria-hidden />
-            </button>
-            {categoryPanelOpen && (
-              <div className="absolute left-0 z-10 mt-1 min-w-[220px] max-h-72 overflow-y-auto p-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCategoryFilter([]);
-                    setCategoryPanelOpen(false);
-                  }}
-                  className={`block w-full text-left px-2 py-1 mb-1 rounded text-sm ${
-                    categoryFilter.length === 0
-                      ? 'font-semibold text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-700'
-                      : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
-                  }`}
-                >
-                  전체
-                </button>
-                <CategoryTreeList
-                  nodes={categoryTree}
-                  depth={0}
-                  expanded={expandedCategoryPaths}
-                  activeFilter={categoryFilter}
-                  onToggle={toggleExpandedCategoryPath}
-                  onSelect={(path) => {
-                    const isSame =
-                      categoryFilter.length === path.length && categoryFilter.every((s, i) => path[i] === s);
-                    setCategoryFilter(isSame ? [] : path);
-                    setCategoryPanelOpen(false);
-                  }}
-                />
+      <div className="mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {newPostButton}
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            {(parsedSearch.tag || parsedSearch.dateFrom || parsedSearch.dateTo) && (
+              <div className="flex items-center gap-1.5">
+                {parsedSearch.tag && (
+                  <span className="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full text-xs font-medium bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900">
+                    <FiTag className="w-3 h-3" aria-hidden />
+                    {parsedSearch.tag}
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery((q) => removeFilterTokens(q, ['tag']))}
+                      className="p-0.5 rounded-full hover:bg-white/20"
+                      aria-label="태그 필터 해제"
+                    >
+                      <FiX className="w-3 h-3" aria-hidden />
+                    </button>
+                  </span>
+                )}
+                {(parsedSearch.dateFrom || parsedSearch.dateTo) && (
+                  <span className="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full text-xs font-medium bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900">
+                    <FiCalendar className="w-3 h-3" aria-hidden />
+                    {parsedSearch.dateFrom === parsedSearch.dateTo ? parsedSearch.dateFrom : `${parsedSearch.dateFrom || '…'} ~ ${parsedSearch.dateTo || '…'}`}
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery((q) => removeFilterTokens(q, ['date', 'before', 'after']))}
+                      className="p-0.5 rounded-full hover:bg-white/20"
+                      aria-label="기간 필터 해제"
+                    >
+                      <FiX className="w-3 h-3" aria-hidden />
+                    </button>
+                  </span>
+                )}
               </div>
             )}
-          </div>
-        )}
-        {recentCategories.length > 0 && (
-          <div className="inline-flex items-center gap-1.5">
-            <span className="text-sm text-neutral-500 dark:text-neutral-400">최근:</span>
-            {recentCategories.map((path) => {
-              const label = path.join(' › ');
-              const isActive = categoryFilter.length === path.length && categoryFilter.every((s, i) => path[i] === s);
-              return (
+            <button
+              type="button"
+              onClick={() => setSettingsOpen((o) => !o)}
+              className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
+                settingsOpen || categoryFilter.length > 0 || sortBy !== 'created_at' || sortOrder !== 'desc'
+                  ? 'bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900'
+                  : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+              }`}
+              aria-expanded={settingsOpen}
+              aria-label={settingsOpen ? '정렬·카테고리 패널 닫기' : '정렬·카테고리 패널 열기'}
+              title="정렬 · 카테고리"
+            >
+              <FiSliders className="w-4 h-4" aria-hidden />
+            </button>
+            <div className="relative" ref={searchBoxRef}>
+              <div
+                className="flex items-center overflow-hidden rounded-full bg-neutral-50 dark:bg-neutral-800 transition-[width] duration-300 ease-out"
+                style={{ width: searchOpen ? 260 : 32 }}
+              >
                 <button
-                  key={label}
                   type="button"
-                  onClick={() => setCategoryFilter(isActive ? [] : path)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                    isActive
-                      ? 'bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900'
-                      : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-                  }`}
+                  onClick={() => setSearchOpen((o) => !o)}
+                  className="shrink-0 w-8 h-8 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-full transition-colors"
+                  aria-label={searchOpen ? '검색 닫기' : '검색'}
                 >
-                  {label}
+                  <FiSearch className="w-4 h-4" aria-hidden />
                 </button>
-              );
-            })}
+                <input
+                  ref={searchInputRef}
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  placeholder="제목… tag:태그 date:2024-01-01"
+                  className="shrink min-w-0 w-[228px] h-8 pr-3 bg-transparent border-none text-neutral-900 dark:text-neutral-100 text-sm placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none"
+                  aria-label="포스트 검색 (tag:, date:, before:, after: 필터 가능)"
+                />
+              </div>
+              {searchOpen && suggestions && (
+                <div className="absolute right-0 z-10 mt-1 min-w-[210px] max-w-[280px] max-h-64 overflow-y-auto p-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-lg">
+                  {suggestions.kind === 'prefix' &&
+                    suggestions.list.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => replaceActiveToken(`${p}:`)}
+                        className="block w-full text-left px-2 py-1.5 rounded text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                      >
+                        <span className="font-mono text-neutral-500 dark:text-neutral-400">{p}:</span>{' '}
+                        {p === 'tag' ? '태그로 필터' : p === 'date' ? '작성일로 필터' : p === 'after' ? '이후 작성된 글' : '이전에 작성된 글'}
+                      </button>
+                    ))}
+                  {suggestions.kind === 'tag' &&
+                    (suggestions.list.length > 0 ? (
+                      suggestions.list.map((t) => (
+                        <button
+                          key={t.tag}
+                          type="button"
+                          onClick={() => replaceActiveToken(`tag:${t.tag}`)}
+                          className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                        >
+                          <span className="inline-flex items-center gap-1.5 min-w-0">
+                            <FiTag className="w-3 h-3 shrink-0" aria-hidden />
+                            <span className="truncate">{t.tag}</span>
+                          </span>
+                          <span className="text-xs text-neutral-400 dark:text-neutral-500 shrink-0">{t.count}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="px-2 py-1.5 text-xs text-neutral-400 dark:text-neutral-500">일치하는 태그가 없습니다.</p>
+                    ))}
+                  {suggestions.kind === 'date' && (
+                    <>
+                      <p className="px-2 pt-1 pb-1.5 text-xs text-neutral-400 dark:text-neutral-500">YYYY-MM-DD로 직접 입력하거나:</p>
+                      {datePresets.map((d) => (
+                        <button
+                          key={d.label}
+                          type="button"
+                          onClick={() => replaceActiveToken(`${suggestions.prefix}:${d.value}`)}
+                          className="block w-full text-left px-2 py-1.5 rounded text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                        >
+                          {d.label} <span className="text-xs text-neutral-400 dark:text-neutral-500">({d.value})</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        )}
-        <span className="ml-auto inline-flex items-center gap-1.5">
-          <FiSliders className="w-4 h-4 text-neutral-500 dark:text-neutral-400 shrink-0" aria-hidden />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="px-3 py-1.5 rounded-lg text-sm font-medium text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-neutral-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-neutral-400 dark:focus:ring-neutral-500"
-            aria-label="정렬 기준"
-          >
-            <option value="created_at">작성일</option>
-            <option value="updated_at">수정일</option>
-          </select>
-          <button
-            type="button"
-            onClick={() => setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
-            title={sortOrder === 'desc' ? '최신순 (클릭 시 오래된순)' : '오래된순 (클릭 시 최신순)'}
-            aria-label={sortOrder === 'desc' ? '최신순, 클릭하면 오래된순으로 변경' : '오래된순, 클릭하면 최신순으로 변경'}
-          >
-            {sortOrder === 'desc' ? <FiArrowDown className="w-4 h-4" aria-hidden /> : <FiArrowUp className="w-4 h-4" aria-hidden />}
-          </button>
-        </span>
+        </div>
+
+        {/* 설정 아이콘 누르면 위 바가 늘어나면서 정렬·카테고리를 보여줌 */}
+        <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: settingsOpen ? '1fr' : '0fr' }}>
+          <div className="overflow-hidden">
+            <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
+              {categoryTree.length > 0 && (
+                <div className="relative" ref={categoryPanelRef}>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryPanelOpen((o) => !o)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      categoryFilter.length > 0
+                        ? 'bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900'
+                        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                    }`}
+                    aria-expanded={categoryPanelOpen}
+                    aria-label="카테고리 필터"
+                  >
+                    카테고리{categoryFilter.length > 0 ? `: ${categoryFilter.join(' › ')}` : ''}
+                    <FiChevronDown className={`w-4 h-4 shrink-0 transition-transform ${categoryPanelOpen ? 'rotate-180' : ''}`} aria-hidden />
+                  </button>
+                  {categoryPanelOpen && (
+                    <div className="absolute left-0 z-10 mt-1 min-w-[220px] max-h-72 overflow-y-auto p-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCategoryFilter([]);
+                          setCategoryPanelOpen(false);
+                        }}
+                        className={`block w-full text-left px-2 py-1 mb-1 rounded text-sm ${
+                          categoryFilter.length === 0
+                            ? 'font-semibold text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-700'
+                            : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                        }`}
+                      >
+                        전체
+                      </button>
+                      <CategoryTreeList
+                        nodes={categoryTree}
+                        depth={0}
+                        expanded={expandedCategoryPaths}
+                        activeFilter={categoryFilter}
+                        onToggle={toggleExpandedCategoryPath}
+                        onSelect={(path) => {
+                          const isSame =
+                            categoryFilter.length === path.length && categoryFilter.every((s, i) => path[i] === s);
+                          setCategoryFilter(isSame ? [] : path);
+                          setCategoryPanelOpen(false);
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+              {recentCategories.length > 0 && (
+                <div className="inline-flex items-center gap-1.5">
+                  <span className="text-sm text-neutral-500 dark:text-neutral-400">최근:</span>
+                  {recentCategories.map((path) => {
+                    const label = path.join(' › ');
+                    const isActive = categoryFilter.length === path.length && categoryFilter.every((s, i) => path[i] === s);
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setCategoryFilter(isActive ? [] : path)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                          isActive
+                            ? 'bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900'
+                            : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <span className="ml-auto inline-flex items-center gap-1.5">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-neutral-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-neutral-400 dark:focus:ring-neutral-500"
+                  aria-label="정렬 기준"
+                >
+                  <option value="created_at">작성일</option>
+                  <option value="updated_at">수정일</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+                  title={sortOrder === 'desc' ? '최신순 (클릭 시 오래된순)' : '오래된순 (클릭 시 최신순)'}
+                  aria-label={sortOrder === 'desc' ? '최신순, 클릭하면 오래된순으로 변경' : '오래된순, 클릭하면 최신순으로 변경'}
+                >
+                  {sortOrder === 'desc' ? <FiArrowDown className="w-4 h-4" aria-hidden /> : <FiArrowUp className="w-4 h-4" aria-hidden />}
+                </button>
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
       {total === 0 ? (
         <p className="text-neutral-500 dark:text-neutral-400 text-sm">
-          {debouncedQuery.trim()
+          {parsedSearch.text.trim() || parsedSearch.tag || parsedSearch.dateFrom || parsedSearch.dateTo
             ? '검색 결과가 없습니다.'
             : categoryFilter.length > 0
               ? `해당 카테고리(${categoryFilter.join(' › ')})에 포스트가 없습니다.`
