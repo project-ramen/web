@@ -52,24 +52,6 @@ function apiPostToPost(p: ApiPost): Post {
   };
 }
 
-/** post.category가 prefix로 시작하는지 (prefix가 비어 있으면 항상 true) */
-function postMatchesCategory(post: Post, prefix: string[]): boolean {
-  if (prefix.length === 0) return true;
-  const cat = post.category ?? [];
-  if (cat.length < prefix.length) return false;
-  return prefix.every((s, i) => cat[i] === s);
-}
-
-function postMatchesSearch(post: Post, q: string): boolean {
-  if (!q.trim()) return true;
-  const lower = q.trim().toLowerCase();
-  const inTitle = (post.title ?? '').toLowerCase().includes(lower);
-  const inSlug = (post.slug ?? '').toLowerCase().includes(lower);
-  const inTags = (post.tags ?? []).some((t) => t.toLowerCase().includes(lower));
-  const inCategory = (post.category ?? []).some((c) => c.toLowerCase().includes(lower));
-  return inTitle || inSlug || inTags || inCategory;
-}
-
 /** slug를 URL 경로에 쓸 수 있게 정규화 (점이 있으면 확장자로 오인돼 404 방지) */
 function slugForUrl(slug: string): string {
   if (!slug) return slug;
@@ -89,10 +71,12 @@ function formatDate(iso: string | undefined): string {
 
 type CategoryNode = { name: string; path: string[]; children: CategoryNode[] };
 
-function buildCategoryTree(posts: Post[]): CategoryNode[] {
+/** 서버 /api/posts/categories 응답 — 존재하는 카테고리 조합 하나당 그 카테고리의 최신 글 작성일 */
+type CategoryInfo = { category: string[]; latest: string };
+
+function buildCategoryTree(paths: string[][]): CategoryNode[] {
   const root: CategoryNode[] = [];
-  posts.forEach((p) => {
-    const cat = p.category ?? [];
+  paths.forEach((cat) => {
     let level = root;
     let pathAcc: string[] = [];
     cat.forEach((segment) => {
@@ -189,34 +173,104 @@ function PostListSkeleton() {
   );
 }
 
+/** URL의 ?category= 파라미터(경로 구분자 "/") → 카테고리 경로 배열 */
+function categoryFromSearch(search: string): string[] {
+  const raw = new URLSearchParams(search).get('category');
+  return raw ? raw.split('/').filter(Boolean) : [];
+}
+
+/** 현재 categoryFilter를 ?category=로 URL에 반영 (히스토리는 늘리지 않고 replace) */
+function syncCategoryToUrl(categoryFilter: string[]) {
+  const url = new URL(window.location.href);
+  if (categoryFilter.length > 0) url.searchParams.set('category', categoryFilter.join('/'));
+  else url.searchParams.delete('category');
+  window.history.replaceState(window.history.state, '', url);
+}
+
+const PAGE_SIZE = 20;
+
+/** /api/posts 목록 요청 쿼리스트링 조립 — 카테고리/검색/정렬/페이지 전부 서버가 처리 */
+function buildPostsQuery(opts: {
+  categoryFilter: string[];
+  q: string;
+  sortBy: string;
+  sortOrder: string;
+  offset: number;
+}): string {
+  const sp = new URLSearchParams();
+  if (opts.categoryFilter.length > 0) sp.set('category', opts.categoryFilter.join('/'));
+  if (opts.q.trim()) sp.set('q', opts.q.trim());
+  sp.set('sortBy', opts.sortBy);
+  sp.set('sortOrder', opts.sortOrder);
+  sp.set('limit', String(PAGE_SIZE));
+  sp.set('offset', String(opts.offset));
+  return sp.toString();
+}
+
 export default function PostList() {
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [items, setItems] = useState<Post[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [categories, setCategories] = useState<CategoryInfo[]>([]);
+  // 카테고리 선택 상태를 ?category= 쿼리에 저장 — 글 상세로 갔다가 뒤로가기해도 필터가 유지되게.
+  const [categoryFilter, setCategoryFilter] = useState<string[]>(() =>
+    typeof window === 'undefined' ? [] : categoryFromSearch(window.location.search)
+  );
   const [sortBy, setSortBy] = useState<'created_at' | 'updated_at'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [expandedCategoryPaths, setExpandedCategoryPaths] = useState<Set<string>>(new Set());
   const searchInputRef = useRef<HTMLInputElement>(null);
   const categoryPanelRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    syncCategoryToUrl(categoryFilter);
+  }, [categoryFilter]);
+
+  // 검색어는 타이핑마다 요청 안 나가게 300ms 디바운스
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  // 카테고리 트리·"최근 카테고리" UI용 — 전체 글 목록과 별개로, 가벼운 전용 엔드포인트에서 한 번만 받아옴
+  useEffect(() => {
+    if (!getApiBase()) return;
+    let cancelled = false;
+    fetch(`${getApiBase()}/api/posts/categories`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+      .then((rows: CategoryInfo[]) => {
+        if (!cancelled) setCategories(rows);
+      })
+      .catch(() => {
+        // 카테고리 트리는 부가 기능 — 실패해도 목록 자체는 그대로 보여줌
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // 카테고리/검색어/정렬이 바뀌면 처음부터(offset 0) 다시 가져옴 — 이전에 쌓아둔 페이지는 버림
   useEffect(() => {
     let cancelled = false;
     if (!getApiBase()) {
       setLoading(false);
       return;
     }
-    fetch(`${getApiBase()}/api/posts`)
+    setLoading(true);
+    setError(null);
+    const qs = buildPostsQuery({ categoryFilter, q: debouncedQuery, sortBy, sortOrder, offset: 0 });
+    fetch(`${getApiBase()}/api/posts?${qs}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
-      .then((rows: ApiPost[]) => {
+      .then((data: { items: ApiPost[]; total: number }) => {
         if (cancelled) return;
-        const list = rows
-          .filter((p) => !p.deleted_at && p.published)
-          .map(apiPostToPost);
-        setPosts(list);
+        setItems(data.items.map(apiPostToPost));
+        setTotal(data.total);
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -225,27 +279,18 @@ export default function PostList() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [categoryFilter, debouncedQuery, sortBy, sortOrder]);
 
-  const postsWithCounts = posts;
+  const categoryTree = useMemo(() => buildCategoryTree(categories.map((c) => c.category)), [categories]);
 
-  const categoryTree = useMemo(() => buildCategoryTree(postsWithCounts), [postsWithCounts]);
-
-  const recentCategories = useMemo(() => {
-    const sorted = [...postsWithCounts]
-      .filter((p) => (p.category?.length ?? 0) > 0)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    const seen = new Set<string>();
-    const result: string[][] = [];
-    for (const p of sorted) {
-      const key = (p.category ?? []).join('\0');
-      if (seen.has(key)) continue;
-      seen.add(key);
-      result.push(p.category ?? []);
-      if (result.length >= 3) break;
-    }
-    return result;
-  }, [postsWithCounts]);
+  const recentCategories = useMemo(
+    () =>
+      [...categories]
+        .sort((a, b) => b.latest.localeCompare(a.latest))
+        .slice(0, 3)
+        .map((c) => c.category),
+    [categories]
+  );
 
   const toggleExpandedCategoryPath = (key: string) => {
     setExpandedCategoryPaths((prev) => {
@@ -266,17 +311,33 @@ export default function PostList() {
     return () => document.removeEventListener('mousedown', handler);
   }, [categoryPanelOpen]);
 
-  const filteredPosts = useMemo(() => {
-    const filtered = postsWithCounts.filter(
-      (p) => postMatchesCategory(p, categoryFilter) && postMatchesSearch(p, searchQuery)
+  // 무한 스크롤: sentinel이 화면에 들어오면 다음 PAGE_SIZE개를 서버에서 이어서 받아옴
+  const hasMore = items.length < total;
+  useEffect(() => {
+    if (loading || loadingMore || !hasMore || !getApiBase()) return;
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        setLoadingMore(true);
+        const qs = buildPostsQuery({ categoryFilter, q: debouncedQuery, sortBy, sortOrder, offset: items.length });
+        fetch(`${getApiBase()}/api/posts?${qs}`)
+          .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+          .then((data: { items: ApiPost[]; total: number }) => {
+            setItems((prev) => [...prev, ...data.items.map(apiPostToPost)]);
+            setTotal(data.total);
+          })
+          .catch(() => {
+            // 추가분 로딩 실패는 조용히 무시 — 다시 스크롤하면 재시도됨
+          })
+          .finally(() => setLoadingMore(false));
+      },
+      { rootMargin: '400px' }
     );
-    const order = sortOrder === 'asc' ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      const tA = new Date(a[sortBy] as string).getTime();
-      const tB = new Date(b[sortBy] as string).getTime();
-      return order === 1 ? tA - tB : tB - tA;
-    });
-  }, [postsWithCounts, categoryFilter, searchQuery, sortBy, sortOrder]);
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loading, loadingMore, hasMore, items.length, categoryFilter, debouncedQuery, sortBy, sortOrder]);
 
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus();
@@ -306,7 +367,7 @@ export default function PostList() {
         <p className="text-neutral-600 dark:text-neutral-400">목록을 불러올 수 없습니다. ({error}) 서버가 실행 중인지 확인하세요.</p>
       </>
     );
-  if (posts.length === 0)
+  if (total === 0 && categoryFilter.length === 0 && !debouncedQuery.trim())
     return (
       <>
         <div className="mb-4">{newPostButton}</div>
@@ -434,9 +495,9 @@ export default function PostList() {
           </button>
         </span>
       </div>
-      {filteredPosts.length === 0 ? (
+      {total === 0 ? (
         <p className="text-neutral-500 dark:text-neutral-400 text-sm">
-          {searchQuery.trim()
+          {debouncedQuery.trim()
             ? '검색 결과가 없습니다.'
             : categoryFilter.length > 0
               ? `해당 카테고리(${categoryFilter.join(' › ')})에 포스트가 없습니다.`
@@ -444,7 +505,7 @@ export default function PostList() {
         </p>
       ) : (
         <ul className="list-none p-0 [&_li]:py-2">
-          {filteredPosts.map((p) => (
+          {items.map((p) => (
             <li key={p.slug} className="flex items-center justify-between gap-3">
               <span className="flex-1 min-w-0 flex flex-col gap-0.5">
                 <span>
@@ -473,13 +534,16 @@ export default function PostList() {
                 aria-label={`${p.title || p.slug} 댓글 ${p.comment_count ?? 0}개`}
               >
                 <FiMessageCircle className="inline-flex shrink-0 [&_svg]:w-[1em] [&_svg]:h-[1em]" aria-hidden />
-                {(p.comment_count ?? 0) > 0 && (
-                  <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{p.comment_count}</span>
-                )}
+                <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{p.comment_count ?? 0}</span>
               </span>
             </li>
           ))}
         </ul>
+      )}
+      {hasMore && (
+        <div ref={loadMoreRef} className="py-4 text-center text-xs text-neutral-400 dark:text-neutral-500">
+          불러오는 중…
+        </div>
       )}
     </>
   );
