@@ -891,7 +891,9 @@ export default function PostList() {
           </div>
         </div>
       </div>
-      {loading ? (
+      {/* 최초 로드(아직 보여줄 게 없을 때)만 스켈레톤 — 필터/정렬/검색 바뀔 때마다 스켈레톤으로
+          싹 갈아치우면 깜빡이는 느낌이 심해서, 그 다음부턴 기존 목록을 흐리게 두고 있다가 새 결과로 스왑 */}
+      {loading && items.length === 0 ? (
         <PostListSkeleton />
       ) : error ? (
         <p className="text-neutral-600 dark:text-neutral-400">목록을 불러올 수 없습니다. ({error}) 서버가 실행 중인지 확인하세요.</p>
@@ -904,7 +906,7 @@ export default function PostList() {
               : '등록된 포스트가 없습니다.'}
         </p>
       ) : (
-        <ul className="list-none p-0 [&_li]:py-2">
+        <ul className={`list-none p-0 [&_li]:py-2 transition-opacity duration-150 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
           {items.map((p) => (
             <li key={p.slug} className="flex items-center justify-between gap-3">
               <span className="flex-1 min-w-0 flex flex-col gap-0.5">
