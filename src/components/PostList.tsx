@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FiCalendar, FiChevronDown, FiChevronRight, FiMessageCircle, FiPlus, FiSearch, FiSliders, FiTag, FiX } from 'react-icons/fi';
 import { LuArrowUpDown } from 'react-icons/lu';
 import { slugToNumericId } from '../lib/slugId.js';
@@ -160,7 +160,11 @@ function CategoryTreeList({
   );
 }
 
-/** 슬라이딩 하이라이트가 있는 세그먼트 라디오 그룹 (정렬 드롭다운용) */
+/**
+ * 슬라이딩 하이라이트가 있는 세그먼트 라디오 그룹 (정렬 드롭다운용).
+ * 라벨 길이가 서로 달라도(예: "최신순" vs "오래된순") 정확히 맞도록 %/fr 계산이 아니라
+ * 실제 버튼의 offsetLeft/offsetWidth를 재서 pill 위치·너비를 잡음.
+ */
 function SegmentedGroup<T extends string>({
   options,
   value,
@@ -170,26 +174,34 @@ function SegmentedGroup<T extends string>({
   value: T;
   onChange: (v: T) => void;
 }) {
+  const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
   const index = Math.max(0, options.findIndex((o) => o.value === value));
+
+  useLayoutEffect(() => {
+    const btn = btnRefs.current[index];
+    if (btn) setIndicator({ left: btn.offsetLeft, width: btn.offsetWidth });
+    // options 자체(라벨 목록)가 바뀌는 일은 없지만 방어적으로 같이 재계산
+  }, [index, options]);
+
   return (
-    <div
-      className="relative grid p-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800"
-      style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }}
-      role="radiogroup"
-    >
-      <div
-        className="absolute inset-y-0.5 left-0.5 rounded-full bg-neutral-900 dark:bg-neutral-100 transition-transform duration-200 ease-out"
-        style={{ width: `calc((100% - 4px) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
-        aria-hidden
-      />
-      {options.map((o) => (
+    <div className="relative inline-flex p-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800" role="radiogroup">
+      {indicator && (
+        <div
+          className="absolute top-0.5 bottom-0.5 rounded-full bg-neutral-900 dark:bg-neutral-100 transition-all duration-200 ease-out"
+          style={{ left: indicator.left, width: indicator.width }}
+          aria-hidden
+        />
+      )}
+      {options.map((o, i) => (
         <button
           key={o.value}
+          ref={(el) => { btnRefs.current[i] = el; }}
           type="button"
           role="radio"
           aria-checked={o.value === value}
           onClick={() => onChange(o.value)}
-          className={`relative z-10 flex items-center justify-center w-full px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+          className={`relative z-10 px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
             o.value === value ? 'text-neutral-100 dark:text-neutral-900' : 'text-neutral-600 dark:text-neutral-300'
           }`}
         >
@@ -722,15 +734,14 @@ export default function PostList() {
                 <div className="absolute right-0 z-10 mt-1 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-lg flex flex-col gap-3">
                   <div>
                     <p className="mb-1.5 text-xs text-neutral-400 dark:text-neutral-500">기준</p>
-                    <select
+                    <SegmentedGroup
+                      options={[
+                        { value: 'created_at' as const, label: '작성일' },
+                        { value: 'updated_at' as const, label: '수정일' },
+                      ]}
                       value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                      className="w-full px-3 py-1.5 rounded-lg text-sm font-medium text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-neutral-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-neutral-400 dark:focus:ring-neutral-500"
-                      aria-label="정렬 기준"
-                    >
-                      <option value="created_at">작성일</option>
-                      <option value="updated_at">수정일</option>
-                    </select>
+                      onChange={setSortBy}
+                    />
                   </div>
                   <div>
                     <p className="mb-1.5 text-xs text-neutral-400 dark:text-neutral-500">순서</p>
