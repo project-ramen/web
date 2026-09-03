@@ -45,7 +45,7 @@ export default function ProjectBody({ content }: ProjectBodyProps) {
   const { resolve } = usePostLinkIndex();
   return (
     <div className="project-body-markdown markdown-content">
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkCallouts, [remarkWikilinks, { resolve }]]} rehypePlugins={[rehypeRaw, rehypeKatex, rehypeSlug, [rehypeHighlight, { detect: true }]]} components={markdownComponents}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath, remarkCallouts, [remarkWikilinks, { resolve }]]} rehypePlugins={[rehypeRaw, rehypeKatex, rehypeSlug, [rehypeHighlight, { detect: false }]]} components={markdownComponents}>
         {content}
       </ReactMarkdown>
     </div>
