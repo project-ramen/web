@@ -24,6 +24,7 @@ type Post = {
   banner_url?: string | null;
   description?: string | null;
   html_mode?: number;
+  view_count?: number;
 };
 type DeletedPost = { id: number; slug: string; title: string; body_md: string; deleted: true; deleted_at: string; category?: string[] };
 type Comment = {
@@ -167,6 +168,15 @@ export default function PostDetailPage({ slug }: Props) {
       .catch(() => { if (!cancelled) setPost(null); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
+  }, [slug]);
+
+  // 조회수 집계 — 브라우저에서 직접 쳐야 서버가 방문자 실제 IP를 봄(SSR 경유하면 서버-서버 호출로 보임).
+  // ?edit=1(작성자가 수정하러 들어온 경우)은 조회로 안 침. URL을 직접 읽어서 isEditMode state와의
+  // 타이밍(초기 렌더에서 아직 false인 순간) 문제 없이 처음부터 정확하게 판단.
+  useEffect(() => {
+    if (!slug || !getApiBase()) return;
+    if (new URLSearchParams(window.location.search).get('edit') === '1') return;
+    fetch(`${getApiBase()}/api/posts/by-slug/${encodeURIComponent(slug)}/view`, { method: 'POST' }).catch(() => {});
   }, [slug]);
 
   useEffect(() => {
@@ -323,7 +333,12 @@ export default function PostDetailPage({ slug }: Props) {
             수정
           </a>
         </div>
-        {displayDate && <time className="text-[0.9375rem] text-neutral-500 dark:text-neutral-400" dateTime={normalPost.created_at}>{displayDate}</time>}
+        {displayDate && (
+          <time className="text-[0.9375rem] text-neutral-500 dark:text-neutral-400" dateTime={normalPost.created_at}>
+            {displayDate}
+            {typeof normalPost.view_count === 'number' && ` · 조회 ${normalPost.view_count}`}
+          </time>
+        )}
       </header>
       <PostRealtimeViewer
         slug={slug}
