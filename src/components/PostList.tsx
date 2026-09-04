@@ -813,7 +813,8 @@ export default function PostList() {
 
         {/* 설정 아이콘 누르면 위 바가 늘어나면서 정렬·카테고리를 보여줌 */}
         <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: settingsOpen ? '1fr' : '0fr' }}>
-          <div className="overflow-hidden">
+          {/* 접혀있을 때만 overflow-hidden — 계속 걸려있으면 안이 열려도 카테고리 드롭다운(absolute)이 잘려서 안 보임 */}
+          <div className={settingsOpen ? '' : 'overflow-hidden'}>
             <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
               {categoryTree.length > 0 && (
                 <div className="relative" ref={categoryPanelRef}>
