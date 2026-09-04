@@ -9,7 +9,7 @@ function getLanguageFromCodeElement(pre: HTMLPreElement | null): string {
 }
 
 const copyButtonBase =
-  'absolute top-2 right-0 py-1.5 px-2.5 text-xs font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-neutral-400 dark:focus:ring-neutral-500 inline-flex items-center justify-center max-w-[6rem] truncate';
+  'py-1 px-2 text-xs font-medium rounded transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-neutral-400 dark:focus:ring-neutral-500 inline-flex items-center justify-center max-w-[6rem] truncate shrink-0';
 
 export function CodeBlockWithCopy({
   children,
@@ -37,19 +37,22 @@ export function CodeBlockWithCopy({
     );
   };
 
-  const label = copied ? '복사됨' : (lang || 'code');
-
   return (
-    <div ref={wrapperRef} className="code-block-wrapper relative">
+    // 예전엔 복사 버튼을 pre 위에 absolute로 띄우고 그 자리만큼 pre 오른쪽 padding을 넓혀서
+    // 좌우 padding이 안 맞았음 — 버튼을 코드 위 별도 헤더 줄로 빼서 pre는 다시 좌우 대칭 padding.
+    <div ref={wrapperRef} className="code-block-wrapper">
+      <div className="code-block-header">
+        <span className="code-block-lang">{lang || 'code'}</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className={`${copyButtonBase} bg-neutral-200/90 hover:bg-neutral-300 text-neutral-700 dark:bg-neutral-700/90 dark:hover:bg-neutral-600 dark:text-neutral-200`}
+          aria-label={copied ? '복사됨' : '코드 복사'}
+        >
+          {copied ? '복사됨' : '복사'}
+        </button>
+      </div>
       <pre {...preProps}>{children}</pre>
-      <button
-        type="button"
-        onClick={handleCopy}
-        className={`${copyButtonBase} bg-neutral-200/90 hover:bg-neutral-300 text-neutral-700 dark:bg-neutral-700/90 dark:hover:bg-neutral-600 dark:text-neutral-200`}
-        aria-label={copied ? '복사됨' : '코드 복사'}
-      >
-        {label}
-      </button>
     </div>
   );
 }
