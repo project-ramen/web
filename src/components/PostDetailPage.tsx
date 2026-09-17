@@ -9,6 +9,7 @@ import PostEditor from './PostEditor';
 import { slugToNumericId } from '../lib/slugId.js';
 
 import { getApiBase } from '../lib/apiBase';
+import { getVisitorFingerprint } from '../lib/fingerprint';
 import { renderInlineFormatting } from '../lib/renderInlineFormatting';
 
 type Post = {
@@ -176,7 +177,18 @@ export default function PostDetailPage({ slug }: Props) {
   useEffect(() => {
     if (!slug || !getApiBase()) return;
     if (new URLSearchParams(window.location.search).get('edit') === '1') return;
-    fetch(`${getApiBase()}/api/posts/by-slug/${encodeURIComponent(slug)}/view`, { method: 'POST' }).catch(() => {});
+    let cancelled = false;
+    getVisitorFingerprint()
+      .catch(() => null)
+      .then((fingerprint) => {
+        if (cancelled) return;
+        fetch(`${getApiBase()}/api/posts/by-slug/${encodeURIComponent(slug)}/view`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fingerprint }),
+        }).catch(() => {});
+      });
+    return () => { cancelled = true; };
   }, [slug]);
 
   useEffect(() => {

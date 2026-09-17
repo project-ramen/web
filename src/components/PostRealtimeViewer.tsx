@@ -17,6 +17,7 @@ import remarkCallouts from '../lib/remarkCallouts';
 import { usePostLinkIndex } from '../lib/usePostLinkIndex';
 import { wrapSelection } from '../lib/textareaFormatting';
 import { renderInlineFormatting } from '../lib/renderInlineFormatting';
+import { FootnoteBackrefAnchor } from '../lib/markdownFootnote';
 
 /** Parse title "width:50%" → style (same as app). */
 function imageWidthStyle(title: string | undefined): React.CSSProperties | undefined {
@@ -42,6 +43,7 @@ const markdownComponents: Components = {
   h5: blockWithNewline('h5'),
   h6: blockWithNewline('h6'),
   pre: CodeBlockWithCopy,
+  a: FootnoteBackrefAnchor,
   table: ({ children, ...rest }) => (
     <div className="table-scroll-wrapper">
       <table {...rest}>{children}</table>

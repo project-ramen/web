@@ -10,6 +10,7 @@ import { CodeBlockWithCopy } from './CodeBlockWithCopy';
 import remarkWikilinks from '../lib/remarkWikilinks';
 import remarkCallouts from '../lib/remarkCallouts';
 import { usePostLinkIndex } from '../lib/usePostLinkIndex';
+import { FootnoteBackrefAnchor } from '../lib/markdownFootnote';
 
 /** Parse title "width:50%" or "width: 200px" → style (same as app). */
 function imageWidthStyle(title: string | undefined): React.CSSProperties | undefined {
@@ -22,6 +23,7 @@ function imageWidthStyle(title: string | undefined): React.CSSProperties | undef
 
 const markdownComponents: Components = {
   pre: CodeBlockWithCopy,
+  a: FootnoteBackrefAnchor,
   img: ({ src, alt, title, style: restStyle, ...rest }) => {
     const widthStyle = imageWidthStyle(title);
     const displayTitle = widthStyle ? undefined : title;
